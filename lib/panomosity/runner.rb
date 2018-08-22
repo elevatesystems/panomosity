@@ -11,10 +11,11 @@ module Panomosity
       convert_translation_parameters
       crop_centers
       fix_conversion_errors
+      fix_unconnected_image_pairs
       generate_border_line_control_points
+      get_detailed_control_point_info
       merge_image_parameters
       prepare_for_pr0ntools
-      remove_long_lines
       remove_anchor_variables
       standardize_roll
     )
@@ -216,6 +217,12 @@ module Panomosity
       save_file
     end
 
+    def fix_unconnected_image_pairs
+      logger.info 'fixing unconnected image pairs'
+      images = Image.parse(@input_file)
+
+    end
+
     def generate_border_line_control_points
       logger.info 'generating border line control points'
       images = Image.parse(@input_file)
@@ -340,6 +347,22 @@ module Panomosity
       save_file
     end
 
+    def get_detailed_control_point_info
+      logger.info 'removing long lines'
+
+      images = Image.parse(@input_file)
+      control_points = ControlPoint.get_detailed_info(@input, cp_type: :normal)
+      control_points.each do |cp|
+        image1 = images.find { |i| cp.n1 == i.id }
+        image2 = images.find { |i| cp.n2 == i.id }
+        # dist = ((image1.normal_x + cp.x1) - (image2.normal_x + cp.x2)) ** 2 + ((image1.normal_y + cp.y1) - (image2.normal_y + cp.y2)) ** 2
+        dx = (image1.d - cp.x1) - (image2.d - cp.x2)
+        dy = (image1.e - cp.y1) - (image2.e - cp.y2)
+        logger.debug "#{cp.to_s} distrt #{Math.sqrt(dx**2+dy**2)} iy1 #{image1.normal_y} iy2 #{image2.normal_y}"
+      end
+      logger.debug "avg #{control_points.map(&:dist).reduce(:+)/control_points.count.to_f}"
+    end
+
     def merge_image_parameters
       logger.info 'merging image parameters'
       control_points = ControlPoint.parse(@compare_file)
@@ -412,22 +435,6 @@ module Panomosity
       end.compact
 
       save_file
-    end
-
-    def remove_long_lines
-      logger.info 'removing long lines'
-
-      images = Image.parse(@input_file)
-      control_points = ControlPoint.get_detailed_info(@input, cp_type: :normal)
-      control_points.each do |cp|
-        image1 = images.find { |i| cp.n1 == i.id }
-        image2 = images.find { |i| cp.n2 == i.id }
-        # dist = ((image1.normal_x + cp.x1) - (image2.normal_x + cp.x2)) ** 2 + ((image1.normal_y + cp.y1) - (image2.normal_y + cp.y2)) ** 2
-        dx = (image1.d - cp.x1) - (image2.d - cp.x2)
-        dy = (image1.e - cp.y1) - (image2.e - cp.y2)
-        logger.debug "#{cp.to_s} distrt #{Math.sqrt(dx**2+dy**2)} iy1 #{image1.normal_y} iy2 #{image2.normal_y}"
-      end
-      logger.debug "avg #{control_points.map(&:dist).reduce(:+)/control_points.count.to_f}"
     end
 
     def standardize_roll

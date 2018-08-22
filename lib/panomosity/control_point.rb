@@ -31,7 +31,7 @@ module Panomosity
     end
 
     def self.get_detailed_info(pto_file_path, cp_type: nil)
-      result = `perl control_point_info.pl --input #{pto_file_path}`
+      result = `control_point_info.pl --input #{pto_file_path}`
       parse(result, cp_type: cp_type, compact: true)
     end
 
