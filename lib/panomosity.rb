@@ -8,7 +8,46 @@ require 'fileutils'
 require 'optparse'
 
 module Panomosity
-end
+  def self.parse(arguments)
+    options = {}
+    OptionParser.new do |parser|
+      parser.banner = 'Usage: panomosity command [options]'
+      parser.separator ''
+      parser.separator 'Specific options:'
 
-#pano = Pano.new(input_pto_file_path: ARGV[1], output_pto_file_path: ARGV[2], check_pto_file_path: ARGV[3])
-#pano.run(ARGV[0])
+      parser.on('-i', '--input PTO', 'Input PTO file') do |pto|
+        options[:input] = pto
+      end
+
+      parser.on('-o', '--output PTO', 'Output PTO file') do |pto|
+        options[:output] = pto
+      end
+
+      parser.on('-c', '--csv [CSV]', 'CSV file for reference') do |csv|
+        options[:csv] = csv
+      end
+
+      parser.on('-k', '--compare [PTO]', 'Compare PTO file for reference') do |pto|
+        options[:compare] = pto
+      end
+
+      parser.on('--without-cropping', 'Do not crop when running "crop_centers" (usually when the original run failed)') do |wc|
+        options[:without_cropping] = wc
+      end
+
+      parser.on('-v', '--[no-]verbose', 'Run verbosely') do |v|
+        options[:verbose] = v
+      end
+
+      parser.on('-h', '--help', 'Display this screen') do
+        puts parser
+        exit
+      end
+
+      parser.parse!(arguments)
+    end
+
+    runner = Runner.new(options)
+    runner.run(ARGV[0])
+  end
+end

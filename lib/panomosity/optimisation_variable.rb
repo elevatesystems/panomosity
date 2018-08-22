@@ -1,5 +1,5 @@
 module Panomosity
-  class OptimizationVariable
+  class OptimisationVariable
     @@attributes = %i(w h f v Ra Rb Rc Rd Re Eev Er Eb r p y TrX TrY TrZ Tpy Tpp j a b c d e g t Va Vb Vc Vd Vx Vy Vm n)
 
     def self.parse(pto_file)
