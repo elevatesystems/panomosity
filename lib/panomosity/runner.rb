@@ -28,7 +28,7 @@ module Panomosity
       @input_file = File.new(@input, 'r').read rescue puts('You must have at least one argument')
       @output_file = File.new(@output, 'w') if @output
       @csv_file = File.new(@csv, 'r').read if @csv
-      @compare_file = File.new(@csv, 'r').read if @compare
+      @compare_file = File.new(@compare, 'r').read if @compare
       @logger = Logger.new(STDOUT)
 
       if options[:verbose]
@@ -342,7 +342,7 @@ module Panomosity
 
     def merge_image_parameters
       logger.info 'merging image parameters'
-      control_points = ControlPoint.parse(@csv_file)
+      control_points = ControlPoint.parse(@compare_file)
       v_lines_started = false
       @lines = @input_file.each_line.map do |line|
         if line[0] == 'v'
