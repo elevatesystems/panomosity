@@ -1,0 +1,4 @@
+#!/usr/bin/env ruby
+
+require 'panomosity'
+Panomosity.parse(ARGV)
