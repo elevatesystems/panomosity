@@ -232,6 +232,46 @@ module Panomosity
       logger.debug "found pair #{control_points_of_pair.first.n1} <> #{control_points_of_pair.first.n2} with #{control_points_of_pair.count} connections"
       average_distance = control_points_of_pair.map(&:dist).reduce(:+).to_f / control_points_of_pair.count
       logger.debug "average distance #{average_distance}"
+      dist_std = Math.sqrt(control_points_of_pair.map { |cp| (cp.dist - average_distance) ** 2 }.reduce(:+) / (control_points_of_pair.count - 1))
+      logger.debug "dist std: #{dist_std}"
+      new_control_points_of_pair = control_points_of_pair.select { |cp| (cp.dist - average_distance).abs < dist_std }
+      logger.info "removed #{control_points_of_pair.count - new_control_points_of_pair.count} outliers"
+      new_average_distance = new_control_points_of_pair.map(&:dist).reduce(:+).to_f / new_control_points_of_pair.count
+      logger.info "new average #{new_average_distance}"
+
+      logger.info 'finding unconnected image pairs'
+      ds = images.map(&:d).uniq.sort
+      es = images.map(&:e).uniq.sort
+
+      unconnected_image_pairs = []
+      # horizontal connection checking
+      ds.each do |d|
+        es.each_with_index do |e, index|
+          next if index == (es.count - 1)
+          image_1 = images.find { |i| i.d == d && i.e == e }
+          image_2 = images.find { |i| i.d == d && i.e == es[index+1] }
+          connected = control_points.any? { |cp| (cp.n1 == image_1.id && cp.n2 == image_2.id) || (cp.n1 == image_2.id && cp.n2 == image_1.id) }
+          unconnected_image_pairs << { type: :horizontal, pair: [image_1, image_2] } unless connected
+        end
+      end
+
+      # vertical connection checking
+      es.each do |e|
+        ds.each_with_index do |d, index|
+          next if index == (ds.count - 1)
+          image_1 = images.find { |i| i.e == e && i.d == d }
+          image_2 = images.find { |i| i.e == e && i.d == ds[index+1] }
+          connected = control_points.any? { |cp| (cp.n1 == image_1.id && cp.n2 == image_2.id) || (cp.n1 == image_2.id && cp.n2 == image_1.id) }
+          unconnected_image_pairs <<  { type: :vertical, pair: [image_1, image_2] } unless connected
+        end
+      end
+
+      logger.info unconnected_image_pairs.map { |i| { type: i[:type], pair: i[:pair].map(&:id) } }
+      control_point = control_points_of_pair.first
+      image_1 = images.find { |i| i.id == control_point.n1 }
+      image_2 = images.find { |i| i.id == control_point.n2 }
+
+      # find
     end
 
     def generate_border_line_control_points
@@ -372,7 +412,7 @@ module Panomosity
 
       second_set_control_points = ControlPoint.get_detailed_info(@new_input)
       control_points = ControlPoint.merge(first_set_control_points, second_set_control_points)
-      control_points.sort_by(&:dist).each do |cp|
+      control_points.each do |cp|
         image1 = images.find { |i| cp.n1 == i.id }
         image2 = images.find { |i| cp.n2 == i.id }
         point1 = image1.to_cartesian(cp.x1, cp.y1)
