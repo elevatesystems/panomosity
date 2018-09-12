@@ -39,6 +39,21 @@ module Panomosity
       parse(result, cp_type: cp_type, compact: true)
     end
 
+    def self.calculate_distances(images, panorama_variable)
+      @control_points.each do |cp|
+        image1 = images.find { |i| cp.n1 == i.id }
+        image2 = images.find { |i| cp.n2 == i.id }
+        point1 = image1.to_cartesian(cp.x1, cp.y1)
+        point2 = image2.to_cartesian(cp.x2, cp.y2)
+
+        angle = Math.acos(point1[0] * point2[0] + point1[1] * point2[1] + point1[2] * point2[2])
+        radius = (panorama_variable.w / 2.0) / Math.tan((panorama_variable.v * Math::PI / 180) / 2)
+
+        distance = angle * radius
+        cp.dist = distance
+      end
+    end
+
     def self.all
       @control_points
     end

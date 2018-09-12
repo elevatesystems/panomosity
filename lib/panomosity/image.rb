@@ -140,11 +140,10 @@ module Panomosity
       self
     end
 
-    def to_cartesian(panorama, x1, y1)
+    def to_cartesian(x1, y1)
       px = (w / 2.0) - x1 + d
       py = (h / 2.0) - y1 + e
       rad = (w / 2.0) / Math.tan((v * Math::PI / 180) / 2)
-      point = [px, py, rad]
       r = self.r * Math::PI / 180
       p = self.p * Math::PI / 180
       y = self.y * Math::PI / 180

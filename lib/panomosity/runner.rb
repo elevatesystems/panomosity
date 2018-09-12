@@ -224,15 +224,9 @@ module Panomosity
     def fix_unconnected_image_pairs
       logger.info 'fixing unconnected image pairs'
       images = Image.parse(@input_file)
-      first_set_control_points = ControlPoint.parse(@input_file)
-
-      @new_input = 'project_remove_equal_signs.pto'
-      runner = Runner.new(@options.merge(input: @input, output: @new_input, remove_equal_signs: true))
-      runner.run('convert_equaled_image_parameters')
-      @input_file = File.new(@new_input, 'r').read
-
-      second_set_control_points = ControlPoint.get_detailed_info(@new_input)
-      control_points = ControlPoint.merge(first_set_control_points, second_set_control_points)
+      panorama_variable = PanoramaVariable.parse(@input_file).first
+      ControlPoint.parse(@input_file)
+      control_points = ControlPoint.calculate_distances(images, panorama_variable)
 
       control_points_of_pair = control_points.group_by { |cp| [cp.n1, cp.n2] }.sort_by { |_, members| members.count }.last.last
       logger.debug "found pair #{control_points_of_pair.first.n1} <> #{control_points_of_pair.first.n2} with #{control_points_of_pair.count} connections"
@@ -381,18 +375,15 @@ module Panomosity
       control_points.sort_by(&:dist).each do |cp|
         image1 = images.find { |i| cp.n1 == i.id }
         image2 = images.find { |i| cp.n2 == i.id }
-        # dist = ((image1.normal_x + cp.x1) - (image2.normal_x + cp.x2)) ** 2 + ((image1.normal_y + cp.y1) - (image2.normal_y + cp.y2)) ** 2
-        dx = (image1.d - cp.x1) - (image2.d - cp.x2)
-        dy = (image1.e - cp.y1) - (image2.e - cp.y2)
-        point1 = image1.to_cartesian(panorama_variable, cp.x1, cp.y1)
-        point2 = image2.to_cartesian(panorama_variable, cp.x2, cp.y2)
+        point1 = image1.to_cartesian(cp.x1, cp.y1)
+        point2 = image2.to_cartesian(cp.x2, cp.y2)
 
         angle = Math.acos(point1[0] * point2[0] + point1[1] * point2[1] + point1[2] * point2[2])
         radius = (panorama_variable.w / 2.0) / Math.tan((panorama_variable.v * Math::PI / 180) / 2)
 
         dr = angle * radius
 
-        logger.debug "#{cp.to_s.sub(/\n/, '')} dist #{cp.dist} distrt #{dr} dratio #{dr / cp.dist}" if cp.n1 == 11 && cp.n2 == 12
+        logger.debug "#{cp.to_s.sub(/\n/, '')} dist #{cp.dist} distrt #{dr} dratio #{dr / cp.dist}"
       end
     end
 
