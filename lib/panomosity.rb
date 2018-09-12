@@ -1,6 +1,7 @@
 require 'panomosity/control_point'
 require 'panomosity/image'
 require 'panomosity/optimisation_variable'
+require 'panomosity/panorama_variable'
 require 'panomosity/runner'
 require 'panomosity/version'
 require 'pathname'
@@ -33,6 +34,10 @@ module Panomosity
 
       parser.on('--without-cropping', 'Do not crop when running "crop_centers" (usually when the original run failed)') do |wc|
         options[:without_cropping] = wc
+      end
+
+      parser.on('--remove-equal-signs', 'Do not crop when running "crop_centers" (usually when the original run failed)') do |eq|
+        options[:remove_equal_signs] = eq
       end
 
       parser.on('-v', '--[no-]verbose', 'Run verbosely') do |v|

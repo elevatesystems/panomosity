@@ -33,9 +33,9 @@ module Panomosity
       @logger = Logger.new(STDOUT)
 
       if options[:verbose]
-        @logger.level = Logger::INFO
-      else
         @logger.level = Logger::DEBUG
+      else
+        @logger.level = Logger::INFO
       end
 
       @logger.formatter = proc do |severity, datetime, progname, msg|
@@ -89,7 +89,11 @@ module Panomosity
       @lines = @input_file.each_line.map do |line|
         image = images.find { |i| i.raw == line }
         if image
-          image.to_s
+          if @options[:remove_equal_signs]
+            image.to_s(without_equal_signs: true)
+          else
+            image.to_s
+          end
         else
           next line
         end
@@ -154,16 +158,16 @@ module Panomosity
       # Since all images have been cropped, we need to change d,e params to move images based on how much was cropped
       # Re-run commands that have been run at this point
       logger.info 'rerunning commands'
-      @new_input_file_path = 'project_converted_translation_cropped.pto'
+      @new_input = 'project_converted_translation_cropped.pto'
       `match-n-shift --input #{@csv} -o project_cropped.pto`
       `pto_var --opt=TrX,TrY project_cropped.pto -o project_pto_var_cropped.pto`
-      runner = Runner.new(@options.merge(input: 'project_pto_var_cropped.pto', output: @new_input_file_path))
+      runner = Runner.new(@options.merge(input: 'project_pto_var_cropped.pto', output: @new_input))
       runner.run('convert_translation_parameters')
-      `pano_modify -p 0 --fov=AUTO -o #{@new_input_file_path} #{@new_input_file_path}`
+      `pano_modify -p 0 --fov=AUTO -o #{@new_input} #{@new_input}`
 
-      logger.info "Read new #{@new_input_file_path}"
+      logger.info "Read new #{@new_input}"
       # Read new input pto file
-      @input_file = File.new(@new_input_file_path, 'r').read
+      @input_file = File.new(@new_input, 'r').read
       images = Image.parse(@input_file)
       ds = images.map(&:d).uniq.sort
       es = images.map(&:e).uniq.sort
@@ -220,7 +224,20 @@ module Panomosity
     def fix_unconnected_image_pairs
       logger.info 'fixing unconnected image pairs'
       images = Image.parse(@input_file)
+      first_set_control_points = ControlPoint.parse(@input_file)
 
+      @new_input = 'project_remove_equal_signs.pto'
+      runner = Runner.new(@options.merge(input: @input, output: @new_input, remove_equal_signs: true))
+      runner.run('convert_equaled_image_parameters')
+      @input_file = File.new(@new_input, 'r').read
+
+      second_set_control_points = ControlPoint.get_detailed_info(@new_input)
+      control_points = ControlPoint.merge(first_set_control_points, second_set_control_points)
+
+      control_points_of_pair = control_points.group_by { |cp| [cp.n1, cp.n2] }.sort_by { |_, members| members.count }.last.last
+      logger.debug "found pair #{control_points_of_pair.first.n1} <> #{control_points_of_pair.first.n2} with #{control_points_of_pair.count} connections"
+      average_distance = control_points_of_pair.map(&:dist).reduce(:+).to_f / control_points_of_pair.count
+      logger.debug "average distance #{average_distance}"
     end
 
     def generate_border_line_control_points
@@ -348,19 +365,35 @@ module Panomosity
     end
 
     def get_detailed_control_point_info
-      logger.info 'removing long lines'
+      logger.info 'getting detailed control point info'
 
       images = Image.parse(@input_file)
-      control_points = ControlPoint.get_detailed_info(@input, cp_type: :normal)
-      control_points.each do |cp|
+      panorama_variable = PanoramaVariable.parse(@input_file).first
+      first_set_control_points = ControlPoint.parse(@input_file)
+
+      @new_input = 'project_remove_equal_signs.pto'
+      runner = Runner.new(@options.merge(input: @input, output: @new_input, remove_equal_signs: true))
+      runner.run('convert_equaled_image_parameters')
+      @input_file = File.new(@new_input, 'r').read
+
+      second_set_control_points = ControlPoint.get_detailed_info(@new_input)
+      control_points = ControlPoint.merge(first_set_control_points, second_set_control_points)
+      control_points.sort_by(&:dist).each do |cp|
         image1 = images.find { |i| cp.n1 == i.id }
         image2 = images.find { |i| cp.n2 == i.id }
         # dist = ((image1.normal_x + cp.x1) - (image2.normal_x + cp.x2)) ** 2 + ((image1.normal_y + cp.y1) - (image2.normal_y + cp.y2)) ** 2
         dx = (image1.d - cp.x1) - (image2.d - cp.x2)
         dy = (image1.e - cp.y1) - (image2.e - cp.y2)
-        logger.debug "#{cp.to_s} distrt #{Math.sqrt(dx**2+dy**2)} iy1 #{image1.normal_y} iy2 #{image2.normal_y}"
+        point1 = image1.to_cartesian(panorama_variable, cp.x1, cp.y1)
+        point2 = image2.to_cartesian(panorama_variable, cp.x2, cp.y2)
+
+        angle = Math.acos(point1[0] * point2[0] + point1[1] * point2[1] + point1[2] * point2[2])
+        radius = (panorama_variable.w / 2.0) / Math.tan((panorama_variable.v * Math::PI / 180) / 2)
+
+        dr = angle * radius
+
+        logger.debug "#{cp.to_s.sub(/\n/, '')} dist #{cp.dist} distrt #{dr} dratio #{dr / cp.dist}" if cp.n1 == 11 && cp.n2 == 12
       end
-      logger.debug "avg #{control_points.map(&:dist).reduce(:+)/control_points.count.to_f}"
     end
 
     def merge_image_parameters

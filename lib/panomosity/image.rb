@@ -106,10 +106,10 @@ module Panomosity
       self[:TrY] * self.class.panosphere * height
     end
 
-    def to_s
+    def to_s(options = {})
       subline_values = (@@attributes - %i(Vm n)).map do |attribute|
         value = self.send(attribute)
-        if @@equaled_attributes.include?(attribute)
+        if @@equaled_attributes.include?(attribute) && !options[:without_equal_signs]
           if value == 0.0
             "#{attribute}=#{value.to_i}"
           else
@@ -138,6 +138,24 @@ module Panomosity
       self[:d] = trx
       self[:e] = try
       self
+    end
+
+    def to_cartesian(panorama, x1, y1)
+      px = (w / 2.0) - x1 + d
+      py = (h / 2.0) - y1 + e
+      rad = (w / 2.0) / Math.tan((v * Math::PI / 180) / 2)
+      point = [px, py, rad]
+      r = self.r * Math::PI / 180
+      p = self.p * Math::PI / 180
+      y = self.y * Math::PI / 180
+
+      # Derived from multiplication of standard roll, pitch, and yaw matrices by the point vector (rad, px, py)
+      point = [Math.cos(p) * Math.cos(y) * rad - Math.sin(y) * Math.cos(p) * px + Math.sin(p) * py,
+               Math.sin(r) * Math.sin(p) * Math.cos(y) * rad + Math.sin(y) * Math.cos(r) * rad - Math.sin(r) * Math.sin(p) * Math.sin(y) * px + Math.cos(r) * Math.cos(y) * px - Math.sin(r) * Math.cos(p) * py,
+               -Math.sin(p) * Math.cos(r) * Math.cos(y) * rad + Math.sin(r) * Math.sin(y) * rad + Math.sin(p) * Math.sin(y) * Math.cos(r) * px + Math.sin(r) * Math.cos(y) * px + Math.cos(r) * Math.cos(p) * py]
+      magnitude = Math.sqrt(point[0] ** 2 + point[1] ** 2 + point[2] ** 2)
+      normalized_point = [point[0] / magnitude, point[1] / magnitude, point[2] / magnitude]
+      normalized_point
     end
   end
 end

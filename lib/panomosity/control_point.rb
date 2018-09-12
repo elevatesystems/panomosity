@@ -28,10 +28,14 @@ module Panomosity
         else
           @control_points
       end
+
+      @control_points
     end
 
     def self.get_detailed_info(pto_file_path, cp_type: nil)
-      result = `control_point_info.pl --input #{pto_file_path}`
+      exe_dir = File.expand_path('../../exe', File.dirname(__FILE__))
+      control_point_info_executable = File.join(exe_dir, 'control_point_info.pl')
+      result = `#{control_point_info_executable} --input #{pto_file_path}`
       parse(result, cp_type: cp_type, compact: true)
     end
 
@@ -55,11 +59,20 @@ module Panomosity
       end
     end
 
+    def self.merge(first_set_control_points, second_set_control_points)
+      @control_points = first_set_control_points.map do |cp1|
+        similar_control_point = second_set_control_points.find { |cp2| cp1 == cp2 }
+        cp1.dist = similar_control_point.dist
+        cp1
+      end
+    end
+
     def initialize(attributes)
       @attributes = attributes
       # conform data types
       @attributes.each do |key, value|
         next if %i(raw).include?(key)
+        next unless value.is_a?(String)
         if value.respond_to?(:include?) && value.include?('.')
           @attributes[key] = value.to_f
         else
@@ -113,6 +126,15 @@ module Panomosity
     def to_s
       line_values = @@attributes.map { |attribute| "#{attribute}#{self.send(attribute)}" }
       "c #{line_values.join(' ')}\n"
+    end
+
+    def ==(o)
+      n1 == o.n1 &&
+        n2 == o.n2 &&
+        x1.floor == o.x1.floor &&
+        x2.floor == o.x2.floor &&
+        y1.floor == o.y1.floor &&
+        y2.floor == o.y2.floor
     end
   end
 end
