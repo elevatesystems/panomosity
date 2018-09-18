@@ -566,7 +566,14 @@ module Panomosity
     def standardize_roll
       logger.info 'standardizing roll'
       images = Image.parse(@input_file)
-      rolls = images.map(&:r)
+      panorama_variable = PanoramaVariable.parse(@input_file).first
+      ControlPoint.parse(@input_file)
+      control_points = ControlPoint.calculate_distances(images, panorama_variable)
+      max_count = (images.count * 0.2).ceil - 1
+      pairs = control_points.group_by { |cp| [cp.n1, cp.n2] }.sort_by { |_, members| -members.count }[0..max_count]
+      image_ids = pairs.map { |image_ids, _| image_ids }.flatten.uniq
+      rolls = images.select { |image| image_ids.include?(image.id) }.map(&:r)
+
       average_roll = rolls.reduce(:+).to_f / rolls.count
       logger.debug "average roll: #{average_roll}"
       roll_std = Math.sqrt(rolls.map { |r| (r - average_roll) ** 2 }.reduce(:+) / (rolls.count - 1))
