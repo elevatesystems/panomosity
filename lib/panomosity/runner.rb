@@ -228,15 +228,27 @@ module Panomosity
       ControlPoint.parse(@input_file)
       control_points = ControlPoint.calculate_distances(images, panorama_variable)
 
-      control_points_of_pair = control_points.group_by { |cp| [cp.n1, cp.n2] }.sort_by { |_, members| members.count }.last.last
-      logger.debug "found pair #{control_points_of_pair.first.n1} <> #{control_points_of_pair.first.n2} with #{control_points_of_pair.count} connections"
-      average_distance = control_points_of_pair.map(&:dist).reduce(:+).to_f / control_points_of_pair.count
+      horizontal_control_points, vertical_control_points = *control_points.partition { |cp| cp.conn_type == :horizontal }
+      control_points_of_pair = horizontal_control_points.group_by { |cp| [cp.n1, cp.n2] }.sort_by { |_, members| members.count }.last.last
+      logger.debug "found horizontal pair #{control_points_of_pair.first.n1} <> #{control_points_of_pair.first.n2} with #{control_points_of_pair.count} connections"
+      average_distance = control_points_of_pair.map(&:pdist).reduce(:+).to_f / control_points_of_pair.count
       logger.debug "average distance #{average_distance}"
-      dist_std = Math.sqrt(control_points_of_pair.map { |cp| (cp.dist - average_distance) ** 2 }.reduce(:+) / (control_points_of_pair.count - 1))
+      dist_std = Math.sqrt(control_points_of_pair.map { |cp| (cp.pdist - average_distance) ** 2 }.reduce(:+) / (control_points_of_pair.count - 1))
       logger.debug "dist std: #{dist_std}"
-      new_control_points_of_pair = control_points_of_pair.select { |cp| (cp.dist - average_distance).abs < dist_std }
-      logger.info "removed #{control_points_of_pair.count - new_control_points_of_pair.count} outliers"
-      new_average_distance = new_control_points_of_pair.map(&:dist).reduce(:+).to_f / new_control_points_of_pair.count
+      horizontal_control_points_of_pair = control_points_of_pair.select { |cp| (cp.pdist - average_distance).abs < dist_std }
+      logger.info "removed #{control_points_of_pair.count - horizontal_control_points_of_pair.count} outliers"
+      new_average_distance = horizontal_control_points_of_pair.map(&:pdist).reduce(:+).to_f / horizontal_control_points_of_pair.count
+      logger.info "new average #{new_average_distance}"
+
+      control_points_of_pair = vertical_control_points.group_by { |cp| [cp.n1, cp.n2] }.sort_by { |_, members| members.count }.last.last
+      logger.debug "found vertical pair #{control_points_of_pair.first.n1} <> #{control_points_of_pair.first.n2} with #{control_points_of_pair.count} connections"
+      average_distance = control_points_of_pair.map(&:pdist).reduce(:+).to_f / control_points_of_pair.count
+      logger.debug "average distance #{average_distance}"
+      dist_std = Math.sqrt(control_points_of_pair.map { |cp| (cp.pdist - average_distance) ** 2 }.reduce(:+) / (control_points_of_pair.count - 1))
+      logger.debug "dist std: #{dist_std}"
+      vertical_control_points_of_pair = control_points_of_pair.select { |cp| (cp.pdist - average_distance).abs < dist_std }
+      logger.info "removed #{control_points_of_pair.count - vertical_control_points_of_pair.count} outliers"
+      new_average_distance = vertical_control_points_of_pair.map(&:pdist).reduce(:+).to_f / vertical_control_points_of_pair.count
       logger.info "new average #{new_average_distance}"
 
       logger.info 'finding unconnected image pairs'
@@ -245,33 +257,75 @@ module Panomosity
 
       unconnected_image_pairs = []
       # horizontal connection checking
-      ds.each do |d|
-        es.each_with_index do |e, index|
-          next if index == (es.count - 1)
-          image_1 = images.find { |i| i.d == d && i.e == e }
-          image_2 = images.find { |i| i.d == d && i.e == es[index+1] }
-          connected = control_points.any? { |cp| (cp.n1 == image_1.id && cp.n2 == image_2.id) || (cp.n1 == image_2.id && cp.n2 == image_1.id) }
-          unconnected_image_pairs << { type: :horizontal, pair: [image_1, image_2] } unless connected
-        end
-      end
-
-      # vertical connection checking
       es.each do |e|
         ds.each_with_index do |d, index|
           next if index == (ds.count - 1)
           image_1 = images.find { |i| i.e == e && i.d == d }
           image_2 = images.find { |i| i.e == e && i.d == ds[index+1] }
           connected = control_points.any? { |cp| (cp.n1 == image_1.id && cp.n2 == image_2.id) || (cp.n1 == image_2.id && cp.n2 == image_1.id) }
-          unconnected_image_pairs <<  { type: :vertical, pair: [image_1, image_2] } unless connected
+          unconnected_image_pairs <<  { type: :horizontal, pair: [image_1, image_2].sort_by(&:id) } unless connected
+        end
+      end
+
+      # vertical connection checking
+      ds.each do |d|
+        es.each_with_index do |e, index|
+          next if index == (es.count - 1)
+          image_1 = images.find { |i| i.d == d && i.e == e }
+          image_2 = images.find { |i| i.d == d && i.e == es[index+1] }
+          connected = control_points.any? { |cp| (cp.n1 == image_1.id && cp.n2 == image_2.id) || (cp.n1 == image_2.id && cp.n2 == image_1.id) }
+          unconnected_image_pairs << { type: :vertical, pair: [image_1, image_2].sort_by(&:id) } unless connected
         end
       end
 
       logger.info unconnected_image_pairs.map { |i| { type: i[:type], pair: i[:pair].map(&:id) } }
-      control_point = control_points_of_pair.first
-      image_1 = images.find { |i| i.id == control_point.n1 }
-      image_2 = images.find { |i| i.id == control_point.n2 }
 
-      # find
+      logger.info 'finding control points with unrealistic distances (<1)'
+      fake_control_points = control_points.select { |cp| cp.pdist <= 1.0 }
+
+      logger.info 'writing new control points'
+      control_point_lines_started = false
+      @lines = @input_file.each_line.map do |line|
+        cp = ControlPoint.parse_line(line)
+        if cp.nil?
+          # Control point lines ended
+          if control_point_lines_started
+            control_point_lines_started = false
+            unconnected_image_pairs.map do |pair|
+              if pair[:type] == :horizontal
+                control_point = horizontal_control_points_of_pair.first
+              else
+                control_point = vertical_control_points_of_pair.first
+              end
+
+              control_point[:n] = pair[:pair].first.id
+              control_point[:N] = pair[:pair].last.id
+              logger.debug "adding control point connecting #{control_point.n1} <> #{control_point.n2}"
+              control_point.to_s
+            end + [line]
+          else
+            next line
+          end
+        else
+          control_point_lines_started = true
+          fake_control_point = fake_control_points.find { |cp| cp.raw == line }
+          if fake_control_point
+            if fake_control_point.conn_type == :horizontal
+              control_point = horizontal_control_points_of_pair.first
+            else
+              control_point = vertical_control_points_of_pair.first
+            end
+            control_point[:n] = fake_control_point[:n]
+            control_point[:N] = fake_control_point[:N]
+            logger.debug "replacing unrealistic control point connecting #{control_point.n1} <> #{control_point.n2}"
+            control_point.to_s
+          else
+            next line
+          end
+        end
+      end.compact.flatten
+
+      save_file
     end
 
     def generate_border_line_control_points
@@ -421,9 +475,17 @@ module Panomosity
         angle = Math.acos(point1[0] * point2[0] + point1[1] * point2[1] + point1[2] * point2[2])
         radius = (panorama_variable.w / 2.0) / Math.tan((panorama_variable.v * Math::PI / 180) / 2)
 
+        x1 = (image1.w / 2.0) - cp.x1 + image1.d
+        y1 = (image1.h / 2.0) - cp.y1 + image1.e
+        x2 = (image2.w / 2.0) - cp.x2 + image2.d
+        y2 = (image2.h / 2.0) - cp.y2 + image2.e
+
+        dist = Math.sqrt((x1 - x2)**2 + (y1 - y2)**2)
+
         dr = angle * radius
 
-        logger.debug "#{cp.to_s.sub(/\n/, '')} dist #{cp.dist} distrt #{dr} dratio #{dr / cp.dist}"
+        type = image1.d == image2.d ? :vertical : :horizontal
+        logger.debug "#{cp.to_s.sub(/\n/, '')} dist #{dr} pixel_dist #{x1-x2},#{y1-y2},#{dist} type #{type}"
       end
     end
 
