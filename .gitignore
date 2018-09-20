@@ -12,3 +12,6 @@
 
 # RubyMine
 /.idea/
+
+# Gem build
+panomosity*.gem
