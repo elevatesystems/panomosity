@@ -6,6 +6,7 @@ module Panomosity
 
     AVAILABLE_COMMANDS = %w(
       check_position_changes
+      clean_control_points
       convert_equaled_image_parameters
       convert_horizontal_lines
       convert_translation_parameters
@@ -81,6 +82,10 @@ module Panomosity
       end
 
       save_file
+    end
+
+    def clean_control_points
+
     end
 
     def convert_equaled_image_parameters
@@ -231,25 +236,19 @@ module Panomosity
       horizontal_control_points, vertical_control_points = *control_points.partition { |cp| cp.conn_type == :horizontal }
       control_points_of_pair = horizontal_control_points.group_by { |cp| [cp.n1, cp.n2] }.sort_by { |_, members| members.count }.last.last
       logger.debug "found horizontal pair #{control_points_of_pair.first.n1} <> #{control_points_of_pair.first.n2} with #{control_points_of_pair.count} connections"
-      average_distance = control_points_of_pair.map(&:pdist).reduce(:+).to_f / control_points_of_pair.count
-      logger.debug "average distance #{average_distance}"
-      dist_std = Math.sqrt(control_points_of_pair.map { |cp| (cp.pdist - average_distance) ** 2 }.reduce(:+) / (control_points_of_pair.count - 1))
-      logger.debug "dist std: #{dist_std}"
-      horizontal_control_points_of_pair = control_points_of_pair.select { |cp| (cp.pdist - average_distance).abs < dist_std }
+      average_distance, distance_std = *calculate_average_and_std(name: :distance, values: control_points_of_pair.map(&:pdist))
+      horizontal_control_points_of_pair = control_points_of_pair.select { |cp| (cp.pdist - average_distance).abs < distance_std }
       logger.info "removed #{control_points_of_pair.count - horizontal_control_points_of_pair.count} outliers"
-      new_average_distance = horizontal_control_points_of_pair.map(&:pdist).reduce(:+).to_f / horizontal_control_points_of_pair.count
-      logger.info "new average #{new_average_distance}"
+      # For logging
+      calculate_average_and_std(name: :distance, values: horizontal_control_points_of_pair.map(&:pdist))
 
       control_points_of_pair = vertical_control_points.group_by { |cp| [cp.n1, cp.n2] }.sort_by { |_, members| members.count }.last.last
       logger.debug "found vertical pair #{control_points_of_pair.first.n1} <> #{control_points_of_pair.first.n2} with #{control_points_of_pair.count} connections"
-      average_distance = control_points_of_pair.map(&:pdist).reduce(:+).to_f / control_points_of_pair.count
-      logger.debug "average distance #{average_distance}"
-      dist_std = Math.sqrt(control_points_of_pair.map { |cp| (cp.pdist - average_distance) ** 2 }.reduce(:+) / (control_points_of_pair.count - 1))
-      logger.debug "dist std: #{dist_std}"
-      vertical_control_points_of_pair = control_points_of_pair.select { |cp| (cp.pdist - average_distance).abs < dist_std }
+      average_distance, distance_std = *calculate_average_and_std(name: :distance, values: control_points_of_pair.map(&:pdist))
+      vertical_control_points_of_pair = control_points_of_pair.select { |cp| (cp.pdist - average_distance).abs < distance_std }
       logger.info "removed #{control_points_of_pair.count - vertical_control_points_of_pair.count} outliers"
-      new_average_distance = vertical_control_points_of_pair.map(&:pdist).reduce(:+).to_f / vertical_control_points_of_pair.count
-      logger.info "new average #{new_average_distance}"
+      # For logging
+      calculate_average_and_std(name: :distance, values: vertical_control_points_of_pair.map(&:pdist))
 
       logger.info 'finding unconnected image pairs'
       ds = images.map(&:d).uniq.sort
@@ -625,14 +624,11 @@ module Panomosity
       image_ids = pairs.map { |image_ids, _| image_ids }.flatten.uniq
       rolls = images.select { |image| image_ids.include?(image.id) }.map(&:r)
 
-      average_roll = rolls.reduce(:+).to_f / rolls.count
-      logger.debug "average roll: #{average_roll}"
-      roll_std = Math.sqrt(rolls.map { |r| (r - average_roll) ** 2 }.reduce(:+) / (rolls.count - 1))
-      logger.debug "roll std: #{roll_std}"
+      average_roll, roll_std = *calculate_average_and_std(name: :roll, values: rolls)
       new_rolls = rolls.select { |r| (r - average_roll).abs < roll_std }
       logger.info "removed #{rolls.count - new_rolls.count} outliers"
-      new_average_roll = new_rolls.reduce(:+).to_f / new_rolls.count
-      logger.info "converting all rolls to #{new_average_roll}"
+      average_roll, _ = *calculate_average_and_std(name: :roll, values: new_rolls)
+      logger.info "converting all rolls to #{average_roll}"
 
       @lines = @input_file.each_line.map do |line|
         image = images.find { |i| i.raw == line }
@@ -663,6 +659,14 @@ module Panomosity
       end
 
       @output_file.close
+    end
+
+    def calculate_average_and_std(name:, values: [])
+      average_value = values.reduce(:+).to_f / values.count
+      logger.debug "average #{name}: #{average_value}"
+      value_std = Math.sqrt(values.map { |v| (v - average_value) ** 2 }.reduce(:+) / (values.count - 1))
+      logger.debug "#{name} std: #{value_std}"
+      [average_value, value_std]
     end
   end
 end
