@@ -36,8 +36,12 @@ module Panomosity
         options[:without_cropping] = wc
       end
 
-      parser.on('--remove-equal-signs', 'Do not crop when running "crop_centers" (usually when the original run failed)') do |eq|
+      parser.on('--remove-equal-signs', 'Remove equal signs when running "convert_equaled_image_parameters" (necessary when parsing the PTO file using Panotools)') do |eq|
         options[:remove_equal_signs] = eq
+      end
+
+      parser.on('--max-removal FRAC', Float, 'Max fraction of control points to be removed when running "clean_control_points" that are statistical outliers') do |mr|
+        options[:max_removal] = mr
       end
 
       parser.on('-v', '--[no-]verbose', 'Run verbosely') do |v|

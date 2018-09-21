@@ -85,7 +85,48 @@ module Panomosity
     end
 
     def clean_control_points
+      logger.info 'cleaning control points'
+      # Since this is very exact, having many outliers in control points distances will cause errors
+      images = Image.parse(@input_file)
+      panorama_variable = PanoramaVariable.parse(@input_file).first
+      ControlPoint.parse(@input_file)
+      control_points = ControlPoint.calculate_distances(images, panorama_variable)
 
+      bad_control_points = []
+      min_control_points = 5
+      control_points.group_by { |cp| [cp.n1, cp.n2] }.select { |_, cps| cps.count > min_control_points }.each do |pair, cps|
+        logger.debug "cleaning pair #{pair.first} <> #{pair.last}"
+        average_x, x_std = *calculate_average_and_std(name: :x, values: cps.map(&:px))
+        average_y, y_std = *calculate_average_and_std(name: :y, values: cps.map(&:py))
+
+        max_removal = ((@options[:max_removal] || 0.2) * cps.count).floor
+        max_iterations = 10
+        iterations = 0
+        bad_cps = cps.select { |cp| (cp.px - average_x).abs >= x_std || (cp.py - average_y).abs >= y_std }
+        while bad_cps.count > max_removal && iterations <= max_iterations
+          x_std *= 1.1
+          y_std *= 1.1
+          iterations += 1
+          bad_cps = cps.select { |cp| (cp.px - average_x).abs >= x_std || (cp.py - average_y).abs >= y_std }
+        end
+
+        logger.info "found #{bad_cps.count} outliers"
+        bad_control_points << bad_cps if bad_cps.count <= max_removal
+      end
+      bad_control_points.flatten!
+
+      logger.info "removing #{bad_control_points.count} control points"
+      @lines = @input_file.each_line.map do |line|
+        control_point = ControlPoint.parse_line(line)
+        # skip this control point if we found it
+        if control_point && bad_control_points.find { |bad_cp| bad_cp.raw == control_point.raw }
+          next
+        else
+          next line
+        end
+      end.compact
+
+      save_file
     end
 
     def convert_equaled_image_parameters
@@ -633,7 +674,7 @@ module Panomosity
       @lines = @input_file.each_line.map do |line|
         image = images.find { |i| i.raw == line }
         if image
-          image.r = new_average_roll
+          image.r = average_roll
           image.to_s
         else
           next line

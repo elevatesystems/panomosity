@@ -59,9 +59,9 @@ module Panomosity
         x2 = (image2.w / 2.0) - cp.x2 + image2.d
         y2 = (image2.h / 2.0) - cp.y2 + image2.e
 
-        pixel_distance = Math.sqrt((x1 - x2)**2 + (y1 - y2)**2)
         cp.px = x1 - x2
         cp.py = y1 - y2
+        pixel_distance = Math.sqrt(cp.px**2 + cp.py**2)
         cp.pdist = pixel_distance
         cp.conn_type = image1.d == image2.d ? :vertical : :horizontal
       end
