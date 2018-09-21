@@ -100,10 +100,11 @@ module Panomosity
         average_y, y_std = *calculate_average_and_std(name: :y, values: cps.map(&:py))
 
         max_removal = ((@options[:max_removal] || 0.2) * cps.count).floor
+        min_cps = 8
         max_iterations = 10
         iterations = 0
         bad_cps = cps.select { |cp| (cp.px - average_x).abs >= x_std || (cp.py - average_y).abs >= y_std }
-        while bad_cps.count > max_removal && iterations <= max_iterations
+        while bad_cps.count > max_removal && (cps.count - bad_cps.count) >= min_cps && iterations <= max_iterations
           x_std *= 1.1
           y_std *= 1.1
           iterations += 1
@@ -660,7 +661,7 @@ module Panomosity
       panorama_variable = PanoramaVariable.parse(@input_file).first
       ControlPoint.parse(@input_file)
       control_points = ControlPoint.calculate_distances(images, panorama_variable)
-      max_count = (images.count * 0.2).ceil - 1
+      max_count = (images.count * 0.5).ceil - 1
       pairs = control_points.group_by { |cp| [cp.n1, cp.n2] }.sort_by { |_, members| -members.count }[0..max_count]
       image_ids = pairs.map { |image_ids, _| image_ids }.flatten.uniq
       rolls = images.select { |image| image_ids.include?(image.id) }.map(&:r)

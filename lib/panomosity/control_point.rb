@@ -47,7 +47,9 @@ module Panomosity
         point1 = image1.to_cartesian(cp.x1, cp.y1)
         point2 = image2.to_cartesian(cp.x2, cp.y2)
 
-        angle = Math.acos(point1[0] * point2[0] + point1[1] * point2[1] + point1[2] * point2[2])
+        product = point1[0] * point2[0] + point1[1] * point2[1] + point1[2] * point2[2]
+        product = 1.0 if product > 1.0
+        angle = Math.acos(product)
         radius = (panorama_variable.w / 2.0) / Math.tan((panorama_variable.v * Math::PI / 180) / 2)
 
         distance = angle * radius
