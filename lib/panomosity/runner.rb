@@ -746,7 +746,7 @@ module Panomosity
       @output_file.close
     end
 
-    def calculate_average_and_std(name:, values: [])
+    def calculate_average_and_std(name: 'value', values: [])
       average_value = values.reduce(:+).to_f / values.count
       logger.debug "average #{name}: #{average_value}"
       value_std = Math.sqrt(values.map { |v| (v - average_value) ** 2 }.reduce(:+) / (values.count - 1))
