@@ -322,7 +322,10 @@ module Panomosity
       logger.info unconnected_image_pairs.map { |i| { type: i[:type], pair: i[:pair].map(&:id) } }
 
       logger.info 'finding control points with unrealistic distances (<1)'
-      fake_control_points = control_points.select { |cp| cp.pdist <= 1.0 }
+      bad_control_points = control_points.select { |cp| cp.pdist <= 1.0 }
+      logger.info 'adding pairs that have do not have enough control points (<3)'
+      changing_control_points_pairs = control_points.group_by { |cp| [cp.n1, cp.n2] }.select { |_, cps| cps.count < 3 }
+      changed_pairs = []
 
       logger.info 'writing new control points'
       control_point_lines_started = false
@@ -374,9 +377,11 @@ module Panomosity
           end
         else
           control_point_lines_started = true
-          fake_control_point = fake_control_points.find { |cp| cp.raw == line }
-          if fake_control_point
-            if fake_control_point.conn_type == :horizontal
+          bad_control_point = bad_control_points.find { |cp| cp.raw == line }
+          changing_control_point_pair = changing_control_points_pairs.find { |_, cps| cps.find { |cp| cp.raw == line } }
+
+          if bad_control_point
+            if bad_control_point.conn_type == :horizontal
               control_point = horizontal_control_points_of_pair.first
             else
               control_point = vertical_control_points_of_pair.first
@@ -388,14 +393,52 @@ module Panomosity
             x1 = x_diff <= 0 ? -x_diff + 15 : 0
             y1 = y_diff <= 0 ? -y_diff + 15 : 0
 
-            control_point[:n] = fake_control_point[:n]
-            control_point[:N] = fake_control_point[:N]
+            control_point[:n] = bad_control_point[:n]
+            control_point[:N] = bad_control_point[:N]
             control_point[:x] = x1
             control_point[:X] = x1 + x_diff
             control_point[:y] = y1
             control_point[:Y] = y1 + y_diff
 
             logger.debug "replacing unrealistic control point connecting #{control_point.n1} <> #{control_point.n2}"
+            i = images.first
+            3.times.map do
+              if control_point.conn_type == :horizontal
+                control_point[:x] += 5
+                control_point[:X] += 5
+                control_point[:y] += i.h * 0.25
+                control_point[:Y] += i.h * 0.25
+              else
+                control_point[:x] += i.w * 0.25
+                control_point[:X] += i.w * 0.25
+                control_point[:y] += 5
+                control_point[:Y] += 5
+              end
+              control_point.to_s
+            end.join
+          elsif changing_control_point_pair && !changed_pairs.include?(changing_control_point_pair.first)
+            changed_pairs << changing_control_point_pair.first
+            bad_control_point = changing_control_point_pair.last.first
+            if bad_control_point.conn_type == :horizontal
+              control_point = horizontal_control_points_of_pair.first
+            else
+              control_point = vertical_control_points_of_pair.first
+            end
+
+            x_diff = control_point.x2 - control_point.x1
+            y_diff = control_point.y2 - control_point.y1
+
+            x1 = x_diff <= 0 ? -x_diff + 15 : 0
+            y1 = y_diff <= 0 ? -y_diff + 15 : 0
+
+            control_point[:n] = bad_control_point[:n]
+            control_point[:N] = bad_control_point[:N]
+            control_point[:x] = x1
+            control_point[:X] = x1 + x_diff
+            control_point[:y] = y1
+            control_point[:Y] = y1 + y_diff
+
+            logger.debug "adding control points connecting #{control_point.n1} <> #{control_point.n2}"
             i = images.first
             3.times.map do
               if control_point.conn_type == :horizontal
