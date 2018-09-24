@@ -192,13 +192,17 @@ module Panomosity
     # Uses image magick to crop centers
     def crop_centers
       logger.info 'cropping centers'
+      scale_factor = @csv.each_line.first.split(',').last.to_f
       unless @options[:without_cropping]
         images = Image.parse(@input_file)
         images.each do |image|
           geometry = `identify -verbose #{image.name} | grep Geometry`.strip
           _, width, height = *geometry.match(/(\d{2,5})x(\d{2,5})(\+|\-)\d{1,5}(\+|\-)\d{1,5}/)
+          percent = (scale_factor*100).round
+          width_offset = (width.to_f * (1 - scale_factor) / 2).round
+          height_offset = (height.to_f * (1 - scale_factor) / 2).round
           logger.debug "cropping #{image.name}"
-          `convert #{image.name} -crop "50%x50%+#{(width.to_f/4).round}+#{(height.to_f/4).round}" #{image.name}`
+          `convert #{image.name} -crop "#{percent}%x#{percent}%+#{width_offset}+#{height_offset}" #{image.name}`
         end
       end
 
@@ -589,38 +593,13 @@ module Panomosity
 
     def get_detailed_control_point_info
       logger.info 'getting detailed control point info'
-
       images = Image.parse(@input_file)
       panorama_variable = PanoramaVariable.parse(@input_file).first
-      first_set_control_points = ControlPoint.parse(@input_file)
+      ControlPoint.parse(@input_file)
+      control_points = ControlPoint.calculate_distances(images, panorama_variable)
 
-      @new_input = 'project_remove_equal_signs.pto'
-      runner = Runner.new(@options.merge(input: @input, output: @new_input, remove_equal_signs: true))
-      runner.run('convert_equaled_image_parameters')
-      @input_file = File.new(@new_input, 'r').read
-
-      second_set_control_points = ControlPoint.get_detailed_info(@new_input)
-      control_points = ControlPoint.merge(first_set_control_points, second_set_control_points)
       control_points.each do |cp|
-        image1 = images.find { |i| cp.n1 == i.id }
-        image2 = images.find { |i| cp.n2 == i.id }
-        point1 = image1.to_cartesian(cp.x1, cp.y1)
-        point2 = image2.to_cartesian(cp.x2, cp.y2)
-
-        angle = Math.acos(point1[0] * point2[0] + point1[1] * point2[1] + point1[2] * point2[2])
-        radius = (panorama_variable.w / 2.0) / Math.tan((panorama_variable.v * Math::PI / 180) / 2)
-
-        x1 = (image1.w / 2.0) - cp.x1 + image1.d
-        y1 = (image1.h / 2.0) - cp.y1 + image1.e
-        x2 = (image2.w / 2.0) - cp.x2 + image2.d
-        y2 = (image2.h / 2.0) - cp.y2 + image2.e
-
-        dist = Math.sqrt((x1 - x2)**2 + (y1 - y2)**2)
-
-        dr = angle * radius
-
-        type = image1.d == image2.d ? :vertical : :horizontal
-        logger.debug "#{cp.to_s.sub(/\n/, '')} dist #{dr} pixel_dist #{x1-x2},#{y1-y2},#{dist} type #{type}"
+        logger.debug "#{cp.to_s.sub(/\n/, '')} dist #{cp.dist} pixel_dist #{cp.px},#{cp.py},#{cp.pdist} conn_type #{cp.conn_type}"
       end
     end
 
