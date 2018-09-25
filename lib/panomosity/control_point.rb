@@ -4,7 +4,7 @@
 module Panomosity
   class ControlPoint
     @@attributes = %i(n N x y X Y t)
-    @@calculated_attributes = %i(dist px py pdist conn_type)
+    @@calculated_attributes = %i(dist px py pdist prx pry prdist conn_type i1 i2)
 
     def self.parse(pto_file, cp_type: nil, compact: false)
       @control_points = pto_file.each_line.map do |line|
@@ -55,7 +55,7 @@ module Panomosity
         distance = angle * radius
         cp.dist = distance
 
-        # Pixel distance
+        # pixel distance
         x1 = (image1.w / 2.0) - cp.x1 + image1.d
         y1 = (image1.h / 2.0) - cp.y1 + image1.e
         x2 = (image2.w / 2.0) - cp.x2 + image2.d
@@ -63,9 +63,17 @@ module Panomosity
 
         cp.px = x1 - x2
         cp.py = y1 - y2
-        pixel_distance = Math.sqrt(cp.px**2 + cp.py**2)
-        cp.pdist = pixel_distance
+        cp.pdist = Math.sqrt(cp.px ** 2 + cp.py ** 2)
+
+        # pixel distance including roll
+        r = image1.r * Math::PI / 180
+        cp.prx = image1.d - image2.d + Math.cos(r) * (cp.x2 - cp.x1) - Math.sin(r) * (cp.y2 - cp.y1)
+        cp.pry = image1.e - image2.e + Math.cos(r) * (cp.y2 - cp.y1) - Math.sin(r) * (cp.x2 - cp.x1)
+        cp.prdist = Math.sqrt(cp.prx ** 2 + cp.pry ** 2)
+
         cp.conn_type = image1.d == image2.d ? :vertical : :horizontal
+        cp.i1 = image1
+        cp.i2 = image2
       end
     end
 

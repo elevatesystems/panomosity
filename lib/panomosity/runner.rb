@@ -192,13 +192,14 @@ module Panomosity
     # Uses image magick to crop centers
     def crop_centers
       logger.info 'cropping centers'
-      scale_factor = @csv.each_line.first.split(',').last.to_f
+      scale_factor = @csv_file.split(/\n/).first.split(',').last.to_f
+      percent = (scale_factor*100).round
+      logger.debug "cropping to #{percent}%"
       unless @options[:without_cropping]
         images = Image.parse(@input_file)
         images.each do |image|
           geometry = `identify -verbose #{image.name} | grep Geometry`.strip
           _, width, height = *geometry.match(/(\d{2,5})x(\d{2,5})(\+|\-)\d{1,5}(\+|\-)\d{1,5}/)
-          percent = (scale_factor*100).round
           width_offset = (width.to_f * (1 - scale_factor) / 2).round
           height_offset = (height.to_f * (1 - scale_factor) / 2).round
           logger.debug "cropping #{image.name}"
@@ -226,13 +227,13 @@ module Panomosity
       d_diffs = []
       ds.each_with_index do |_, i|
         next if i == 0
-        d_diffs.push((ds[i] - ds[i-1]).abs / 2)
+        d_diffs.push((ds[i] - ds[i-1]).abs * (1-scale_factor))
       end
 
       e_diffs = []
       es.each_with_index do |_, i|
         next if i == 0
-        e_diffs.push((es[i] - es[i-1]).abs / 2)
+        e_diffs.push((es[i] - es[i-1]).abs * (1-scale_factor))
       end
 
       d_map = Hash[ds.map.with_index { |d, i| i == 0 ? [d, d] : [d, d - d_diffs[0..(i-1)].reduce(:+)] }]
@@ -599,7 +600,7 @@ module Panomosity
       control_points = ControlPoint.calculate_distances(images, panorama_variable)
 
       control_points.each do |cp|
-        logger.debug "#{cp.to_s.sub(/\n/, '')} dist #{cp.dist} pixel_dist #{cp.px},#{cp.py},#{cp.pdist} conn_type #{cp.conn_type}"
+        logger.debug "#{cp.to_s.sub(/\n/, '')} dist #{cp.dist.round(4)} pixel_dist #{cp.px.round(4)},#{cp.py.round(4)},#{cp.pdist.round(4)} pixel_r_dist #{cp.prx.round(4)},#{cp.pry.round(4)},#{cp.prdist.round(4)} conn_type #{cp.conn_type}"
       end
     end
 
