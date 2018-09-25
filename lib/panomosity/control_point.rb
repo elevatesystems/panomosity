@@ -174,5 +174,16 @@ module Panomosity
         y1.floor == o.y1.floor &&
         y2.floor == o.y2.floor
     end
+
+    def recalculate_pixel_distance
+      r = i1.r * Math::PI / 180
+      self.prx = i1.d - i2.d + Math.cos(r) * (x2 - x1) - Math.sin(r) * (y2 - y1)
+      self.pry = i1.e - i2.e + Math.cos(r) * (y2 - y1) - Math.sin(r) * (x2 - x1)
+      self.prdist = Math.sqrt(prx ** 2 + pry ** 2)
+    end
+
+    def detailed_info
+      "#{to_s.sub(/\n/, '')} dist #{dist.round(4)} pixel_dist #{px.round(4)},#{py.round(4)},#{pdist.round(4)} pixel_r_dist #{prx.round(4)},#{pry.round(4)},#{prdist.round(4)} conn_type #{conn_type}"
+    end
   end
 end
