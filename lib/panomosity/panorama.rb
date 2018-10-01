@@ -2,7 +2,8 @@ module Panomosity
   class Panorama
     include Panomosity::Utils
 
-    attr_accessor :images, :control_points, :variable, :optimisation_variables, :logger
+    attr_accessor :images, :control_points, :variable, :optimisation_variables, :logger, :horizontal_pairs,
+                  :vertical_pairs, :horizontal_neighborhoods_group, :vertical_neighborhoods_group
 
     def initialize(input, logger = nil)
       @input = input
@@ -23,7 +24,7 @@ module Panomosity
       end
     end
 
-    def calculate_neighborhoods(distance: 30, amount_ratio: 0.2)
+    def calculate_neighborhoods(distance: 30, amount_ratio: 0.2, log: true)
       pairs = control_points.group_by { |cp| [cp.n1, cp.n2] }
       amount = (amount_ratio * (images.count)).floor
 
@@ -43,11 +44,11 @@ module Panomosity
       # group cps that are close in distance to each other
       # start with horizontal pairs
       @horizontal_pairs = calculate_neighborhood_info(pairs: horizontal_pairs, distance: distance)
-      log_detailed_neighborhood_info(name: :horizontal, pairs: @horizontal_pairs)
+      log_detailed_neighborhood_info(name: :horizontal, pairs: @horizontal_pairs) if log
 
       # vertical pairs
       @vertical_pairs = calculate_neighborhood_info(pairs: vertical_pairs, distance: distance)
-      log_detailed_neighborhood_info(name: :vertical, pairs: @vertical_pairs)
+      log_detailed_neighborhood_info(name: :vertical, pairs: @vertical_pairs) if log
 
       { horizontal_pairs: @horizontal_pairs, vertical_pairs: @vertical_pairs }
     end
@@ -116,7 +117,7 @@ module Panomosity
           y_avg: y_avg
         }
       end
-      neighborhood_group.sort_by { |n| -n[:total_control_points] }.each do |ng|
+      neighborhood_group.sort_by { |n| -n[:total_control_points] }[0..5].each do |ng|
         logger.debug "#{ng[:prdist_avg]} #{ng[:prdist_std]} #{ng[:total_control_points]} x#{ng[:x_avg]} y#{ng[:y_avg]}"
       end
 
@@ -128,9 +129,9 @@ module Panomosity
     end
 
     def log_detailed_neighborhood_info(name: :horizontal, pairs: [])
-      pair = pairs.sort_by{|pair| -pair[:best_neighborhood][:neighborhood].count}.first
+      pair = pairs.sort_by{|pair| pair[:best_neighborhood] ? -pair[:best_neighborhood][:neighborhood].count : 0}.first
       pairs.each do |p|
-        logger.debug "#{name} pair #{p[:pair]} found #{p[:best_neighborhood][:neighborhood].count} control points"
+        logger.debug "#{name} pair #{p[:pair]} found #{p[:best_neighborhood] ? p[:best_neighborhood][:neighborhood].count : 0} control points"
         p[:neighborhoods].each do |neighborhood|
           logger.debug "neighborhood centered at #{neighborhood[:cp].x1},#{neighborhood[:cp].y1}: #{neighborhood[:neighborhood].count} control points"
           logger.debug "neighborhood centered at #{neighborhood[:cp].x1},#{neighborhood[:cp].y1}: prdist #{neighborhood[:prdist_avg]},#{neighborhood[:prdist_std]} prx #{neighborhood[:prx_avg]},#{neighborhood[:prx_std]} pry #{neighborhood[:pry_avg]},#{neighborhood[:pry_std]}"
@@ -140,9 +141,9 @@ module Panomosity
         end
       end
       pairs.each do |p|
-        logger.debug "#{name} pair #{p[:pair]} found #{p[:best_neighborhood][:neighborhood].count} control points"
+        logger.debug "#{name} pair #{p[:pair]} found #{p[:best_neighborhood] ? p[:best_neighborhood][:neighborhood].count : 0} control points"
       end
-      logger.debug "#{name} pair #{pair[:pair]} found #{pair[:best_neighborhood][:neighborhood].count} control points"
+      logger.debug "#{name} pair #{pair[:pair]} found #{pair[:best_neighborhood] ? pair[:best_neighborhood][:neighborhood].count : 0} control points"
     end
 
     def clean_control_points(options = {})

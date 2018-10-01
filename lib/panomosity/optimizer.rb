@@ -26,86 +26,92 @@ module Panomosity
     end
 
     def run_position_optimizer
+      panorama.calculate_neighborhoods(amount_ratio: 1.0)
+      panorama.calculate_neighborhood_groups(name: :horizontal, pairs: panorama.horizontal_pairs)
+      panorama.calculate_neighborhood_groups(name: :vertical, pairs: panorama.vertical_pairs)
+
       ds = images.map(&:d).uniq.sort
       es = images.map(&:e).uniq.sort
 
       # start horizontally
-      xs = []
-      es.each_with_index do |e, i_e|
-        next if i_e == es.count - 1
-        ds.each_with_index do |d, i_d|
-          next if i_d == ds.count - 1
-          image1 = images.find { |i| i.d == d && i.e == e }
-          image2 = images.find { |i| i.d == ds[i_d+1] && i.e == e }
-          id1, id2 = *[image1.id, image2.id].minmax
-          cps = control_points.select { |cp| cp.conn_type == :horizontal && cp.n1 == id1 && cp.n2 == id2 }
-          xs << cps.map(&:prx)
-        end
-      end
-
-      xs.flatten!
-      x_avg, x_std = *calculate_average_and_std(name: :x, values: xs, logger: logger)
-      logger.debug 'filter first standard deviations'
-      xs.select! { |x| (x - x_avg).abs < x_std }
-      x_avg, x_std = *calculate_average_and_std(name: :x, values: xs, logger: logger)
-      logger.debug 'filter second standard deviations'
-      xs.select! { |x| (x - x_avg).abs < x_std }
-      x_avg, _ = *calculate_average_and_std(name: :x, values: xs, logger: logger)
+      x_avg = panorama.horizontal_neighborhoods_group.first[:x_avg]
 
       d_map = {}
       ds.each_with_index do |d, i|
-        if d == ds.first
-          d_map[d] = d
-        else
-          d_map[d] = d + -x_avg * i
-        end
+        d_map[d] = d + -x_avg * i
       end
       logger.debug "created d_map #{d_map}"
 
       # vertical
-      ys = []
-      ds.each_with_index do |d, i_d|
-        next if i_d == ds.count - 1
-        es.each_with_index do |e, i_e|
-          next if i_e == es.count - 1
-          image1 = images.find { |i| i.d == d && i.e == e }
-          image2 = images.find { |i| i.d == d && i.e == es[i_e+1] }
-          id1, id2 = *[image1.id, image2.id].minmax
-          cps = control_points.select { |cp| cp.conn_type == :vertical && cp.n1 == id1 && cp.n2 == id2 }
-          ys << cps.map(&:pry)
-        end
-      end
-
-      ys.flatten!
-      y_avg, y_std = *calculate_average_and_std(name: :y, values: ys, logger: logger)
-      logger.debug 'filter first standard deviations'
-      ys.select! { |y| (y - y_avg).abs < y_std }
-      y_avg, y_std = *calculate_average_and_std(name: :y, values: ys, logger: logger)
-      logger.debug 'filter second standard deviations'
-      ys.select! { |y| (y - y_avg).abs < y_std }
-      y_avg, _ = *calculate_average_and_std(name: :y, values: ys, logger: logger)
+      y_avg = panorama.vertical_neighborhoods_group.first[:y_avg]
 
       e_map = {}
       es.each_with_index do |e, i|
-        if e == es.first
-          e_map[e] = e
-        else
-          e_map[e] = e + -y_avg * i
-        end
+        e_map[e] = e + -y_avg * i
       end
       logger.debug "created e_map #{e_map}"
 
+      x_avg = panorama.vertical_neighborhoods_group.first[:x_avg]
+      y_avg = panorama.horizontal_neighborhoods_group.first[:y_avg]
+
+      de_map = {}
+      d_map.each_with_index do |(dk,dv),di|
+        e_map.each_with_index do |(ek,ev),ei|
+          de_map["#{dk},#{ek}"] = {}
+          de_map["#{dk},#{ek}"][:d] = dv + -x_avg * ei
+          de_map["#{dk},#{ek}"][:e] = ev + -y_avg * di
+        end
+      end
+      logger.debug "created de_map #{de_map}"
+
       logger.debug 'updating image attributes'
       images.each do |image|
-        image.d = d_map[image.d]
-        image.e = e_map[image.e]
+        d = image.d
+        e = image.e
+        image.d = de_map["#{d},#{e}"][:d]
+        image.e = de_map["#{d},#{e}"][:e]
       end
     end
 
     def run_roll_optimizer
       r = images.map(&:r).first
-      pairs_hash = panorama.calculate_neighborhoods
+      logger.debug "current roll #{r}"
+      panorama.calculate_neighborhoods(amount_ratio: 1.0, log: false)
+      panorama.calculate_neighborhood_groups(name: :horizontal, pairs: panorama.horizontal_pairs)
+      panorama.calculate_neighborhood_groups(name: :vertical, pairs: panorama.vertical_pairs)
 
+      y_avg = panorama.horizontal_neighborhoods_group.first[:y_avg]
+      x_avg = panorama.vertical_neighborhoods_group.first[:x_avg]
+
+      previous_y_avg = y_avg
+      r -= 0.01
+      logger.debug "current roll #{r}"
+      panorama.images.each { |i| i.r = r }
+      panorama.control_points = ControlPoint.calculate_distances(panorama.images, panorama.variable)
+      panorama.calculate_neighborhoods(amount_ratio: 1.0, log: false)
+      panorama.calculate_neighborhood_groups(name: :horizontal, pairs: panorama.horizontal_pairs)
+      panorama.calculate_neighborhood_groups(name: :vertical, pairs: panorama.vertical_pairs)
+
+      y_avg = panorama.horizontal_neighborhoods_group.first[:y_avg]
+      x_avg = panorama.vertical_neighborhoods_group.first[:x_avg]
+
+      while y_avg.abs < previous_y_avg.abs
+        r -= 0.01
+        logger.debug "current roll #{r}"
+        previous_y_avg = y_avg
+        panorama.images.each { |i| i.r = r }
+        panorama.control_points = ControlPoint.calculate_distances(panorama.images, panorama.variable)
+        panorama.calculate_neighborhoods(amount_ratio: 1.0, log: false)
+        panorama.calculate_neighborhood_groups(name: :horizontal, pairs: panorama.horizontal_pairs)
+        panorama.calculate_neighborhood_groups(name: :vertical, pairs: panorama.vertical_pairs)
+
+        y_avg = panorama.horizontal_neighborhoods_group.first[:y_avg]
+        x_avg = panorama.vertical_neighborhoods_group.first[:x_avg]
+      end
+
+      images.each do |image|
+        image.r = r
+      end
     end
   end
 end
