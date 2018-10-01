@@ -185,5 +185,9 @@ module Panomosity
     def detailed_info
       "#{to_s.sub(/\n/, '')} dist #{dist.round(4)} pixel_dist #{px.round(4)},#{py.round(4)},#{pdist.round(4)} pixel_r_dist #{prx.round(4)},#{pry.round(4)},#{prdist.round(4)} conn_type #{conn_type}"
     end
+
+    def attributes
+      @attributes
+    end
   end
 end
