@@ -104,11 +104,8 @@ module Panomosity
 
     def run_roll_optimizer
       r = images.map(&:r).first
-      amount = (0.2 * (images.count)).floor
-      pairs = control_points.group_by { |cp| [cp.n1, cp.n2] }.sort_by { |_, cps|  [calculate_average_and_std(values: cps.map(&:prdist)).first, -cps.count] }[0..(amount-1)]
-      pairs.select{|_,cps| cps.first.conn_type == :horizontal}.each do |pair, cps|
-        logger.debug "#{pair} #{cps.map(&:detailed_info).join("\n")}"
-      end
+      pairs_hash = panorama.calculate_neighborhoods
+
     end
   end
 end
