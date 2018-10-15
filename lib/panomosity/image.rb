@@ -156,5 +156,15 @@ module Panomosity
       normalized_point = [point[0] / magnitude, point[1] / magnitude, point[2] / magnitude]
       normalized_point
     end
+
+    def column
+      return unless name =~ /c(\d+)_r(\d+)\.jpg/
+      name.scan(/c(\d+)_r(\d+)\.jpg/).flatten.map(&:to_i).first
+    end
+
+    def row
+      return unless name =~ /c(\d+)_r(\d+)\.jpg/
+      name.scan(/c(\d+)_r(\d+)\.jpg/).flatten.map(&:to_i).last
+    end
   end
 end

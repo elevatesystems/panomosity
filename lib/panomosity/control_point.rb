@@ -71,7 +71,7 @@ module Panomosity
         cp.pry = image1.e - image2.e + Math.cos(r) * (cp.y2 - cp.y1) - Math.sin(r) * (cp.x2 - cp.x1)
         cp.prdist = Math.sqrt(cp.prx ** 2 + cp.pry ** 2)
 
-        cp.conn_type = image1.d == image2.d ? :vertical : :horizontal
+        cp.conn_type = image1.column == image2.column ? :vertical : :horizontal
         cp.i1 = image1
         cp.i2 = image2
       end
