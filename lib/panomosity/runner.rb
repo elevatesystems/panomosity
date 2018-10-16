@@ -175,10 +175,8 @@ module Panomosity
       unless @options[:without_cropping]
         images = Image.parse(@input_file)
         images.each do |image|
-          geometry = `identify -verbose #{image.name} | grep Geometry`.strip
-          _, width, height = *geometry.match(/(\d{2,5})x(\d{2,5})(\+|\-)\d{1,5}(\+|\-)\d{1,5}/)
-          width_offset = (width.to_f * (1 - scale_factor) / 2).round
-          height_offset = (height.to_f * (1 - scale_factor) / 2).round
+          width_offset = (image.w.to_f * (1 - scale_factor) / 2).round
+          height_offset = (image.h.to_f * (1 - scale_factor) / 2).round
           logger.debug "cropping #{image.name}"
           `convert #{image.name} -crop "#{percent}%x#{percent}%+#{width_offset}+#{height_offset}" #{image.name}`
         end

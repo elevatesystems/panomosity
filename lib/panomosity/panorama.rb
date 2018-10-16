@@ -95,8 +95,16 @@ module Panomosity
 
     # get all neighborhoods based on how many control points are within the std of the distance
     def calculate_neighborhood_groups(name: :horizontal, pairs: [])
-      # start with horizontal pairs
-      total_neighborhoods = pairs.map { |p| p[:neighborhoods].select { |n| n[:neighborhood_within_std].count >= 3 }}.flatten
+      neighborhood_default = 3
+      total_neighborhoods = pairs.map { |p| p[:neighborhoods].select { |n| n[:neighborhood_within_std].count >= neighborhood_default }}.flatten
+
+      if total_neighborhoods.map { |n| n[:prdist_std] }.empty?
+        logger.warn 'total_neighborhoods came up empty, neighborhood default count to 2'
+        neighborhood_default = 2
+        total_neighborhoods = pairs.map { |p| p[:neighborhoods].select { |n| n[:neighborhood_within_std].count >= neighborhood_default }}.flatten
+        raise 'still could not find neighborhoods' if total_neighborhoods.map { |n| n[:prdist_std] }.empty?
+      end
+
       logger.debug "twice reducing #{name} neighborhood std outliers"
       avg, std = *calculate_average_and_std(values: total_neighborhoods.map { |n| n[:prdist_std] })
       total_neighborhoods.select! { |n| (avg - n[:prdist_std]).abs < std }
@@ -129,6 +137,7 @@ module Panomosity
     end
 
     def log_detailed_neighborhood_info(name: :horizontal, pairs: [])
+      logger.debug "showing #{name} pair information"
       pair = pairs.sort_by{|pair| pair[:best_neighborhood] ? -pair[:best_neighborhood][:neighborhood].count : 0}.first
       pairs.each do |p|
         logger.debug "#{name} pair #{p[:pair]} found #{p[:best_neighborhood] ? p[:best_neighborhood][:neighborhood].count : 0} control points"
@@ -143,7 +152,7 @@ module Panomosity
       pairs.each do |p|
         logger.debug "#{name} pair #{p[:pair]} found #{p[:best_neighborhood] ? p[:best_neighborhood][:neighborhood].count : 0} control points"
       end
-      logger.debug "#{name} pair #{pair[:pair]} found #{pair[:best_neighborhood] ? pair[:best_neighborhood][:neighborhood].count : 0} control points"
+      #logger.debug "#{name} pair #{pair[:pair]} found #{pair[:best_neighborhood] ? pair[:best_neighborhood][:neighborhood].count : 0} control points"
     end
 
     def clean_control_points(options = {})

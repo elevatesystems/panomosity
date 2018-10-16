@@ -26,7 +26,7 @@ module Panomosity
     end
 
     def run_position_optimizer
-      panorama.calculate_neighborhoods(amount_ratio: 1.0)
+      panorama.calculate_neighborhoods(amount_ratio: 1.0, log: false)
       panorama.calculate_neighborhood_groups(name: :horizontal, pairs: panorama.horizontal_pairs)
       panorama.calculate_neighborhood_groups(name: :vertical, pairs: panorama.vertical_pairs)
 
@@ -75,16 +75,18 @@ module Panomosity
 
     def run_roll_optimizer
       r = images.map(&:r).first
+      original_roll = r
       logger.debug "current roll #{r}"
       panorama.calculate_neighborhoods(amount_ratio: 1.0, log: false)
       panorama.calculate_neighborhood_groups(name: :horizontal, pairs: panorama.horizontal_pairs)
       panorama.calculate_neighborhood_groups(name: :vertical, pairs: panorama.vertical_pairs)
 
-      y_avg = panorama.horizontal_neighborhoods_group.first[:y_avg]
-      x_avg = panorama.vertical_neighborhoods_group.first[:x_avg]
+      # we grab the top 5 neighborhood groups and get the average distance for them and average that
+      horizontal_distances = panorama.horizontal_neighborhoods_group[0..5].map{|g| g[:prdist_avg]}
+      vertical_distances = panorama.vertical_neighborhoods_group[0..5].map{|g| g[:prdist_avg]}
+      dist_avg = calculate_average_and_std(values: horizontal_distances + vertical_distances).first
 
-      previous_y_avg = y_avg
-      r -= 0.01
+      r -= 0.05
       logger.debug "current roll #{r}"
       panorama.images.each { |i| i.r = r }
       panorama.control_points = ControlPoint.calculate_distances(panorama.images, panorama.variable)
@@ -92,21 +94,45 @@ module Panomosity
       panorama.calculate_neighborhood_groups(name: :horizontal, pairs: panorama.horizontal_pairs)
       panorama.calculate_neighborhood_groups(name: :vertical, pairs: panorama.vertical_pairs)
 
-      y_avg = panorama.horizontal_neighborhoods_group.first[:y_avg]
-      x_avg = panorama.vertical_neighborhoods_group.first[:x_avg]
+      horizontal_distances = panorama.horizontal_neighborhoods_group[0..5].map{|g| g[:prdist_avg]}
+      vertical_distances = panorama.vertical_neighborhoods_group[0..5].map{|g| g[:prdist_avg]}
+      new_dist_avg = calculate_average_and_std(values: horizontal_distances + vertical_distances).first
+      logger.debug "avg: #{dist_avg} new_avg: #{new_dist_avg}"
 
-      while y_avg.abs < previous_y_avg.abs
-        r -= 0.01
+      if new_dist_avg < dist_avg
+        logger.debug 'found that subtracting roll will decrease distances, resetting roll...'
+        operation = :-
+      else
+        logger.debug 'found that adding roll will decrease distances, resetting roll...'
+        operation = :+
+        r = original_roll
+        r += 0.05
         logger.debug "current roll #{r}"
-        previous_y_avg = y_avg
         panorama.images.each { |i| i.r = r }
         panorama.control_points = ControlPoint.calculate_distances(panorama.images, panorama.variable)
         panorama.calculate_neighborhoods(amount_ratio: 1.0, log: false)
         panorama.calculate_neighborhood_groups(name: :horizontal, pairs: panorama.horizontal_pairs)
         panorama.calculate_neighborhood_groups(name: :vertical, pairs: panorama.vertical_pairs)
 
-        y_avg = panorama.horizontal_neighborhoods_group.first[:y_avg]
-        x_avg = panorama.vertical_neighborhoods_group.first[:x_avg]
+        horizontal_distances = panorama.horizontal_neighborhoods_group[0..5].map{|g| g[:prdist_avg]}
+        vertical_distances = panorama.vertical_neighborhoods_group[0..5].map{|g| g[:prdist_avg]}
+        new_dist_avg = calculate_average_and_std(values: horizontal_distances + vertical_distances).first
+      end
+
+      while new_dist_avg <= dist_avg
+        r = r.send(operation, 0.05)
+        logger.debug "current roll #{r}"
+        dist_avg = new_dist_avg
+        panorama.images.each { |i| i.r = r }
+        panorama.control_points = ControlPoint.calculate_distances(panorama.images, panorama.variable)
+        panorama.calculate_neighborhoods(amount_ratio: 1.0, log: false)
+        panorama.calculate_neighborhood_groups(name: :horizontal, pairs: panorama.horizontal_pairs)
+        panorama.calculate_neighborhood_groups(name: :vertical, pairs: panorama.vertical_pairs)
+
+        horizontal_distances = panorama.horizontal_neighborhoods_group[0..5].map{|g| g[:prdist_avg]}
+        vertical_distances = panorama.vertical_neighborhoods_group[0..5].map{|g| g[:prdist_avg]}
+        new_dist_avg = calculate_average_and_std(values: horizontal_distances + vertical_distances).first
+        logger.debug "avg: #{dist_avg} new_avg: #{new_dist_avg}"
       end
 
       images.each do |image|
