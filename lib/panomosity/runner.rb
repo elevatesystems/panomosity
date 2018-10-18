@@ -416,10 +416,20 @@ module Panomosity
       optimizer = Optimizer.new(panorama)
       optimizer.run
 
+      # sort images
+      logger.info 'sorting images in case they get out of order'
+      lexically_sorted_images = optimizer.images
+      numerically_sorted_images = optimizer.images.sort_by { |image| [image.column, image.row] }
+      image_map = {}
+      lexically_sorted_images.each_with_index do |image_l, i|
+        image_map[image_l.name] = numerically_sorted_images[i]
+      end
+
       @lines = @input_file.each_line.map do |line|
         image = optimizer.images.find { |i| i.raw == line }
         if image
-          image.to_s
+          sorted_image = image_map[image.name]
+          sorted_image.to_s
         else
           next line
         end
