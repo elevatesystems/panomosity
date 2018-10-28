@@ -394,6 +394,25 @@ module Panomosity
     def merge_image_parameters
       logger.info 'merging image parameters'
       control_points = ControlPoint.parse(@compare_file)
+      images = Image.parse(@compare_file)
+
+      # sort images
+      logger.info 'sorting images in case they get out of order'
+      lexically_sorted_images = images
+      numerically_sorted_images = images.sort_by { |image| [image.column, image.row] }
+      image_map = {}
+      lexically_sorted_images.each_with_index do |image_l, i|
+        image_map[image_l.name] = numerically_sorted_images[i]
+        image_map[numerically_sorted_images[i].id.to_i] = image_l.id.to_i
+      end
+
+      # fix control points
+      control_points.each do |control_point|
+        logger.debug "#{control_point[:n]} => #{image_map[control_point[:n].to_i]} | #{control_point[:N]} => #{image_map[control_point[:N].to_i]}"
+        control_point[:n] = image_map[control_point[:n].to_i]
+        control_point[:N] = image_map[control_point[:N].to_i]
+      end
+
       v_lines_started = false
       @lines = @input_file.each_line.map do |line|
         if line[0] == 'v'
@@ -416,20 +435,10 @@ module Panomosity
       optimizer = Optimizer.new(panorama)
       optimizer.run
 
-      # sort images
-      logger.info 'sorting images in case they get out of order'
-      lexically_sorted_images = optimizer.images
-      numerically_sorted_images = optimizer.images.sort_by { |image| [image.column, image.row] }
-      image_map = {}
-      lexically_sorted_images.each_with_index do |image_l, i|
-        image_map[image_l.name] = numerically_sorted_images[i]
-      end
-
       @lines = @input_file.each_line.map do |line|
         image = optimizer.images.find { |i| i.raw == line }
         if image
-          sorted_image = image_map[image.name]
-          sorted_image.to_s
+          image.to_s
         else
           next line
         end
@@ -450,7 +459,7 @@ module Panomosity
         i.n = "c#{ds.reverse.index(i.d)}_r#{es.reverse.index(i.e)}.jpg"
         i.v = fov
       end
-      images = images.sort_by(&:n)
+      images = images.sort_by { |image| [image.column, image.row] }
 
       index = -1
       @lines = @input_file.each_line.map do |line|
