@@ -408,7 +408,6 @@ module Panomosity
 
       # fix control points
       control_points.each do |control_point|
-        logger.debug "#{control_point[:n]} => #{image_map[control_point[:n].to_i]} | #{control_point[:N]} => #{image_map[control_point[:N].to_i]}"
         control_point[:n] = image_map[control_point[:n].to_i]
         control_point[:N] = image_map[control_point[:N].to_i]
       end
