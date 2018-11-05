@@ -47,6 +47,10 @@ module Panomosity
         options[:max_removal] = mr
       end
 
+      parser.on('--res RES', 'Resolution of images for nona_grid') do |res|
+        options[:res] = res
+      end
+
       parser.on('-v', '--[no-]verbose', 'Run verbosely') do |v|
         options[:verbose] = v
       end

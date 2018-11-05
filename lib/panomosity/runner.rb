@@ -18,6 +18,7 @@ module Panomosity
       generate_border_line_control_points
       get_detailed_control_point_info
       merge_image_parameters
+      nona_grid
       optimize
       prepare_for_pr0ntools
       remove_anchor_variables
@@ -426,6 +427,30 @@ module Panomosity
       end.compact
 
       save_file
+    end
+
+    def nona_grid
+      logger.info 'running nona and generated column and row based stitch sections'
+      images = Image.parse(@input_file)
+      res = @options[:res] || 'low'
+      columns = images.map(&:column).uniq.sort
+      columns.each do |column|
+        @output = "project_nona_c#{column}.pto"
+        @output_file = File.new(@output, 'w')
+        logger.debug "creating file #{@output}"
+        @lines = @input_file.each_line.map do |line|
+          image = images.find { |i| i.raw == line }
+          if image
+            image.to_s if image.column == column
+          else
+            next line
+          end
+        end.compact
+        save_file
+        logger.debug "running nona #{@output}"
+        output = `nona --save-intermediate-images --intermediate-suffix=intermediate -v -m TIFF_m --seam=blend #{@output} -o #{res}_res_stitch_section_c#{column}_`
+        logger.debug output
+      end
     end
 
     def optimize
