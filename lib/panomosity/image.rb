@@ -110,7 +110,8 @@ module Panomosity
       subline_values = (@@attributes - %i(Vm n)).map do |attribute|
         value = self.send(attribute)
         if @@equaled_attributes.include?(attribute) && !options[:without_equal_signs]
-          if value == 0.0
+          # Floats are distinctly not equaled attributes
+          if value == 0 && value.is_a?(Integer)
             "#{attribute}=#{value.to_i}"
           else
             "#{attribute}#{value}"
