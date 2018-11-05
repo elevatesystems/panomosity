@@ -107,9 +107,9 @@ module Panomosity
 
       logger.debug "twice reducing #{name} neighborhood std outliers"
       avg, std = *calculate_average_and_std(values: total_neighborhoods.map { |n| n[:prdist_std] })
-      total_neighborhoods.select! { |n| (avg - n[:prdist_std]).abs < std }
+      total_neighborhoods.select! { |n| (avg - n[:prdist_std]).abs <= std }
       avg, std = *calculate_average_and_std(values: total_neighborhoods.map { |n| n[:prdist_std] })
-      total_neighborhoods.select! { |n| (avg - n[:prdist_std]).abs < std }
+      total_neighborhoods.select! { |n| (avg - n[:prdist_std]).abs <= std }
       neighborhood_group = total_neighborhoods.map do |neighborhood|
         ns_total = total_neighborhoods.select { |n| (n[:prdist_avg] - neighborhood[:prdist_avg]).abs < neighborhood[:prdist_std] }
         cps_total = ns_total.map { |n| n[:neighborhood_within_std].count }.reduce(:+)
