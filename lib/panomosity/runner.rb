@@ -16,6 +16,7 @@ module Panomosity
       fix_conversion_errors
       fix_unconnected_image_pairs
       generate_border_line_control_points
+      get_columns_and_rows
       get_detailed_control_point_info
       merge_image_parameters
       nona_grid
@@ -378,6 +379,13 @@ module Panomosity
       end.compact.flatten
 
       save_file
+    end
+
+    def get_columns_and_rows
+      images = Image.parse(@input_file)
+      columns = images.map(&:column).sort.last
+      rows = images.map(&:row).sort.last
+      puts "#{columns},#{rows}"
     end
 
     def get_detailed_control_point_info
