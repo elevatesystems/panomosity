@@ -17,7 +17,8 @@ module Panomosity
       fix_unconnected_image_pairs
       generate_border_line_control_points
       get_columns_and_rows
-      get_detailed_control_point_info
+      get_control_point_info
+      get_neigborhood_info
       merge_image_parameters
       nona_grid
       optimize
@@ -36,16 +37,12 @@ module Panomosity
       @output_file = File.new(@output, 'w') if @output
       @csv_file = File.new(@csv, 'r').read if @csv
       @compare_file = File.new(@compare, 'r').read if @compare
-      @logger = Logger.new(STDOUT)
+      @logger = Panomosity.logger
 
-      if options[:verbose]
+      if options[:verbose] || options[:very_verbose]
         @logger.level = Logger::DEBUG
       else
         @logger.level = Logger::INFO
-      end
-
-      @logger.formatter = proc do |severity, datetime, progname, msg|
-        "[#{datetime}][#{severity}] #{msg}\n"
       end
     end
 
@@ -92,8 +89,8 @@ module Panomosity
     def clean_control_points
       logger.info 'cleaning control points'
       # Since this is very exact, having many outliers in control points distances will cause errors
-      panorama = Panorama.new(@input_file, logger)
-      bad_control_points = panorama.clean_control_points_neighborhoods(@options)
+      panorama = Panorama.new(@input_file, @options)
+      bad_control_points = panorama.clean_control_points
 
       logger.info "removing #{bad_control_points.count} control points"
       @lines = @input_file.each_line.map do |line|
@@ -252,8 +249,8 @@ module Panomosity
 
     def fix_unconnected_image_pairs
       logger.info 'fixing unconnected image pairs'
-      panorama = Panorama.new(@input_file, logger)
-      @lines = panorama.fix_unconnected_image_pairs_neighborhoods
+      panorama = Panorama.new(@input_file)
+      @lines = panorama.fix_unconnected_image_pairs
       save_file
     end
 
@@ -388,7 +385,7 @@ module Panomosity
       puts "#{columns},#{rows}"
     end
 
-    def get_detailed_control_point_info
+    def get_control_point_info
       logger.info 'getting detailed control point info'
       images = Image.parse(@input_file)
       panorama_variable = PanoramaVariable.parse(@input_file).first
@@ -398,6 +395,12 @@ module Panomosity
       control_points.each do |cp|
         logger.debug cp.detailed_info
       end
+    end
+
+    def get_neigborhood_info
+      logger.info 'getting detailed neighborhood info'
+      panorama = Panorama.new(@input_file, @options)
+      panorama.get_neigborhood_info
     end
 
     def merge_image_parameters
@@ -463,7 +466,7 @@ module Panomosity
 
     def optimize
       logger.info 'optimizing'
-      panorama = Panorama.new(@input_file, logger)
+      panorama = Panorama.new(@input_file)
       optimizer = Optimizer.new(panorama)
       optimizer.run
 

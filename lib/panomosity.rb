@@ -1,7 +1,10 @@
 require 'panomosity/control_point'
 require 'panomosity/image'
+require 'panomosity/neighborhood'
+require 'panomosity/neighborhood_group'
 require 'panomosity/optimisation_variable'
 require 'panomosity/optimizer'
+require 'panomosity/pair'
 require 'panomosity/panorama'
 require 'panomosity/panorama_variable'
 require 'panomosity/runner'
@@ -55,6 +58,10 @@ module Panomosity
         options[:verbose] = v
       end
 
+      parser.on('-v', '--vverbose', 'Run very verbosely') do |v|
+        options[:very_verbose] = v
+      end
+
       parser.on('-h', '--help', 'Display this screen') do
         puts parser
         exit
@@ -65,5 +72,16 @@ module Panomosity
 
     runner = Runner.new(options)
     runner.run(ARGV[0])
+  end
+
+  def self.logger
+    if @logger.nil?
+      @logger = Logger.new(STDOUT)
+      @logger.level = Logger::DEBUG
+      @logger.formatter = proc do |severity, datetime, progname, msg|
+        "[#{datetime}][#{severity}] #{msg}\n"
+      end
+    end
+    @logger
   end
 end
