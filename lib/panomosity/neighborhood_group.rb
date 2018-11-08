@@ -63,7 +63,7 @@ module Panomosity
       self.neighborhoods = pairs.map { |p| p.good_neighborhoods_within_std(count: default_count) }.flatten
 
       if neighborhoods.empty?
-        logger.warn 'total_neighborhoods came up empty, neighborhood default count to 2'
+        logger.warn 'total neighborhoods came up empty, neighborhood default count to 2'
         default_count = 2
         self.neighborhoods = pairs.map { |p| p.good_neighborhoods_within_std(count: default_count) }.flatten
         raise 'still could not find neighborhoods' if neighborhoods.empty?
@@ -98,9 +98,9 @@ module Panomosity
 
     def calculate
       @neighborhoods = total_neighborhoods.select { |n| (n.prdist_avg - center.prdist_avg).abs <= center.prdist_std }
-      @control_points = neighborhoods.map { |n| n.control_points_within_std.count }
-      @x_avg = calculate_average(values: neighborhoods.map(&:control_points_within_std).flatten.map(&:px))
-      @y_avg = calculate_average(values: neighborhoods.map(&:control_points_within_std).flatten.map(&:py))
+      @control_points = neighborhoods.map(&:control_points_within_std).flatten.uniq { |cp| cp.raw }
+      @x_avg = calculate_average(values: control_points.map(&:px))
+      @y_avg = calculate_average(values: control_points.map(&:py))
       @prdist_avg = center.prdist_avg
       @prdist_std = center.prdist_std
       self

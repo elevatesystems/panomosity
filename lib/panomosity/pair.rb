@@ -22,16 +22,16 @@ module Panomosity
         @pairs
       end
 
-      def good_control_points_within_std
-        @pairs.map { |pair| pair.good_neighborhoods_within_std.map(&:control_points_within_std) }.flatten.uniq { |cp| cp.raw }
+      def good_control_points_to_keep
+        @pairs.map(&:good_control_points_to_keep).flatten.uniq { |cp| cp.raw }
       end
 
       def unconnected
         @pairs.select(&:unconnected?).sort_by(&:to_s)
       end
 
-      def without_enough_control_points
-        @pairs.select { |pair| pair.connected? && pair.control_points.count < 3 }
+      def without_enough_control_points(ignore_connected: false)
+        @pairs.select { |pair| (ignore_connected || pair.connected?) && pair.control_points.count < 3 }
       end
     end
 
@@ -119,7 +119,7 @@ module Panomosity
         logger.debug "total number single cp neighborhoods: #{pair.neighborhoods.select{|n| n.control_points.count == 1}.count}"
         pair.neighborhoods.each do |neighborhood|
           logger.debug neighborhood.info
-          logger.debug "neighborhood: distance: #{neighborhood.distance} | total number of control points: #{neighborhood.control_points.count}"
+          logger.debug "neighborhood: distance,pair_distance: #{neighborhood.distance},#{neighborhood.pair_distance} | total number of control points: #{neighborhood.control_points.count}"
           logger.debug "neighborhood: center prdist: #{neighborhood.center.prdist} | total number of control points within std: #{neighborhood.control_points_within_std.count}"
         end
       end
@@ -156,6 +156,14 @@ module Panomosity
       control_points.empty?
     end
 
+    def first_image
+      pair.first
+    end
+
+    def last_image
+      pair.last
+    end
+
     def average_distance
       calculate_average(values: control_points.map(&:prdist), ignore_empty: true)
     end
@@ -170,6 +178,23 @@ module Panomosity
     # gets all control points for neighborhoods with a good std of distance
     def good_neighborhoods_within_std(count: 3)
       @neighborhoods.select { |n| n.control_points_within_std.count >= count }
+    end
+
+    def good_control_points_to_keep(count: 3)
+      control_points_to_keep = good_neighborhoods_within_std(count: count).map(&:control_points_within_std).flatten.uniq { |cp| cp.raw }
+
+      # Keep all our control points if we have less than 10
+      if control_points.count >= 10
+        ratio = control_points_to_keep.count.to_f / control_points.count
+        if ratio < 0.5
+          Panomosity.logger.warn "#{to_s} keeping less than 50% (#{(ratio*100).round(4)}%) of #{control_points.count} control points. Reverting and keeping all control points"
+          control_points
+        else
+          control_points_to_keep
+        end
+      else
+        control_points
+      end
     end
 
     def best_neighborhood

@@ -4,8 +4,8 @@ module Panomosity
   class Neighborhood
     include Panomosity::Utils
 
-    attr_accessor :center, :pair, :distance, :control_points, :control_points_within_std, :prdist_avg, :prdist_std,
-                  :prx_avg, :prx_std, :pry_avg, :pry_std
+    attr_accessor :center, :pair, :distance, :pair_distance, :control_points, :control_points_within_std, :prdist_avg,
+                  :prdist_std, :prx_avg, :prx_std, :pry_avg, :pry_std
 
     def initialize(center:, pair:, distance:)
       @center = center
@@ -14,8 +14,17 @@ module Panomosity
     end
 
     def calculate
-      @control_points = pair.control_points.select do |cp|
-        cp.x1.between?(center.x1 - distance, center.x1 + distance) && cp.y1.between?(center.y1 - distance, center.y1 + distance)
+      # Instead of setting a static distance use a distance that is dependent on the type of connection
+      if pair.horizontal?
+        @pair_distance = (pair.first_image.h * 0.1).round
+        @control_points = pair.control_points.select do |cp|
+          cp.x1.between?(center.x1 - distance, center.x1 + distance) && cp.y1.between?(center.y1 - pair_distance, center.y1 + pair_distance)
+        end
+      else
+        @pair_distance = (pair.first_image.w * 0.1).round
+        @control_points = pair.control_points.select do |cp|
+          cp.x1.between?(center.x1 - pair_distance, center.x1 + pair_distance) && cp.y1.between?(center.y1 - distance, center.y1 + distance)
+        end
       end
 
       @prdist_avg, @prdist_std = *calculate_average_and_std(values: control_points.map(&:prdist))
