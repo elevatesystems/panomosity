@@ -98,7 +98,7 @@ module Panomosity
 
     def calculate
       @neighborhoods = total_neighborhoods.select { |n| (n.prdist_avg - center.prdist_avg).abs <= center.prdist_std }
-      @control_points = neighborhoods.map(&:control_points_within_std).flatten.uniq { |cp| cp.raw }
+      @control_points = neighborhoods.map(&:control_points_within_std).flatten.uniq(&:raw)
       @x_avg = calculate_average(values: control_points.map(&:px))
       @y_avg = calculate_average(values: control_points.map(&:py))
       @prdist_avg = center.prdist_avg

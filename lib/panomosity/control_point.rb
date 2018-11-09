@@ -3,7 +3,7 @@
 
 module Panomosity
   class ControlPoint
-    @@attributes = %i(n N x y X Y t)
+    @@attributes = %i(n N x y X Y t g)
     @@calculated_attributes = %i(dist px py pdist prx pry prdist conn_type i1 i2)
 
     def self.parse(pto_file, cp_type: nil, compact: false)
@@ -161,18 +161,27 @@ module Panomosity
       vertical? || horizontal?
     end
 
+    def generated?
+      !g.nil?
+    end
+
+    def not_generated?
+      !generated?
+    end
+
     def to_s
-      line_values = @@attributes.map { |attribute| "#{attribute}#{self.send(attribute)}" }
+      attrs = generated? ? @@attributes : (@@attributes - %i(g))
+      line_values = attrs.map { |attribute| "#{attribute}#{self.send(attribute)}" }
       "c #{line_values.join(' ')}\n"
     end
 
     def ==(o)
       n1 == o.n1 &&
-        n2 == o.n2 &&
-        x1.floor == o.x1.floor &&
-        x2.floor == o.x2.floor &&
-        y1.floor == o.y1.floor &&
-        y2.floor == o.y2.floor
+      n2 == o.n2 &&
+      x1.floor == o.x1.floor &&
+      x2.floor == o.x2.floor &&
+      y1.floor == o.y1.floor &&
+      y2.floor == o.y2.floor
     end
 
     def recalculate_pixel_distance

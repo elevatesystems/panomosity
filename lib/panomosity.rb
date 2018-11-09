@@ -58,7 +58,7 @@ module Panomosity
         options[:verbose] = v
       end
 
-      parser.on('-v', '--vverbose', 'Run very verbosely') do |v|
+      parser.on('-vv', '--vverbose', 'Run very verbosely') do |v|
         options[:very_verbose] = v
       end
 

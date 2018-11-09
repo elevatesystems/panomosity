@@ -14,25 +14,28 @@ module Panomosity
     end
 
     def calculate
+      # Do not include generated control points in neighborhood calculations
+      pair_control_points = pair.control_points.select(&:not_generated?)
+
       # Instead of setting a static distance use a distance that is dependent on the type of connection
       if pair.horizontal?
         @pair_distance = (pair.first_image.h * 0.1).round
-        @control_points = pair.control_points.select do |cp|
+        @control_points = pair_control_points.select do |cp|
           cp.x1.between?(center.x1 - distance, center.x1 + distance) && cp.y1.between?(center.y1 - pair_distance, center.y1 + pair_distance)
         end
       else
         @pair_distance = (pair.first_image.w * 0.1).round
-        @control_points = pair.control_points.select do |cp|
+        @control_points = pair_control_points.select do |cp|
           cp.x1.between?(center.x1 - pair_distance, center.x1 + pair_distance) && cp.y1.between?(center.y1 - distance, center.y1 + distance)
         end
       end
 
-      @prdist_avg, @prdist_std = *calculate_average_and_std(values: control_points.map(&:prdist))
-      @prx_avg, @prx_std = *calculate_average_and_std(values: control_points.map(&:prx))
-      @pry_avg, @pry_std = *calculate_average_and_std(values: control_points.map(&:pry))
+      @prdist_avg, @prdist_std = *calculate_average_and_std(values: control_points.map(&:prdist), ignore_empty: true)
+      @prx_avg, @prx_std = *calculate_average_and_std(values: control_points.map(&:prx), ignore_empty: true)
+      @pry_avg, @pry_std = *calculate_average_and_std(values: control_points.map(&:pry), ignore_empty: true)
 
       # add in control points that have similar distances (within std)
-      @control_points_within_std = pair.control_points.select { |c| c.prdist.between?(center.prdist - prdist_std, center.prdist + prdist_std) }
+      @control_points_within_std = pair_control_points.select { |c| c.prdist.between?(center.prdist - prdist_std, center.prdist + prdist_std) }
       self
     end
 

@@ -23,7 +23,7 @@ module Panomosity
       end
 
       def good_control_points_to_keep
-        @pairs.map(&:good_control_points_to_keep).flatten.uniq { |cp| cp.raw }
+        @pairs.map(&:good_control_points_to_keep).flatten.uniq(&:raw)
       end
 
       def unconnected
@@ -83,6 +83,12 @@ module Panomosity
       log_detailed_neighborhood_info(name: :vertical, pairs: @vertical_pairs)
     end
 
+    def self.calculate_neighborhood_groups
+      NeighborhoodGroup.parse_info(@panorama)
+      NeighborhoodGroup.calculate(name: :horizontal, pairs: @horizontal_pairs)
+      NeighborhoodGroup.calculate(name: :vertical, pairs: @vertical_pairs)
+    end
+
     def self.log_detailed_neighborhood_info(name: :horizontal, pairs: [])
       return unless @panorama.options[:very_verbose]
       logger.debug "showing #{name} pair information"
@@ -98,12 +104,6 @@ module Panomosity
       end
     end
 
-    def self.calculate_neighborhood_groups
-      NeighborhoodGroup.parse_info(@panorama)
-      NeighborhoodGroup.calculate(name: :horizontal, pairs: @horizontal_pairs)
-      NeighborhoodGroup.calculate(name: :vertical, pairs: @vertical_pairs)
-    end
-
     def self.info
       logger.debug "total number of control points: #{@pairs.map(&:control_points).flatten.count}"
       logger.debug 'displaying horizontal pair info'
@@ -117,6 +117,25 @@ module Panomosity
         logger.debug "control points: x_dist,x_std: #{x_dist},#{x_std} | y_dist,y_std: #{y_dist},#{y_std} | dist,std: #{dist},#{std}"
         logger.debug "total number of neighborhoods: #{pair.neighborhoods.count}"
         logger.debug "total number single cp neighborhoods: #{pair.neighborhoods.select{|n| n.control_points.count == 1}.count}"
+        logger.debug "total number generated control points: #{pair.control_points.select(&:generated?).count}"
+        pair.neighborhoods.each do |neighborhood|
+          logger.debug neighborhood.info
+          logger.debug "neighborhood: distance,pair_distance: #{neighborhood.distance},#{neighborhood.pair_distance} | total number of control points: #{neighborhood.control_points.count}"
+          logger.debug "neighborhood: center prdist: #{neighborhood.center.prdist} | total number of control points within std: #{neighborhood.control_points_within_std.count}"
+        end
+      end
+      logger.debug 'displaying vertical pair info'
+      logger.debug "total number of vertical control points: #{@vertical_pairs.map(&:control_points).flatten.count}"
+      @vertical_pairs.each do |pair|
+        logger.debug pair.info
+        logger.debug "total number of control points: #{pair.control_points.count}"
+        x_dist, x_std = *calculate_average_and_std(values: pair.control_points.map(&:prx))
+        y_dist, y_std = *calculate_average_and_std(values: pair.control_points.map(&:pry))
+        dist, std = *calculate_average_and_std(values: pair.control_points.map(&:prdist))
+        logger.debug "control points: x_dist,x_std: #{x_dist},#{x_std} | y_dist,y_std: #{y_dist},#{y_std} | dist,std: #{dist},#{std}"
+        logger.debug "total number of neighborhoods: #{pair.neighborhoods.count}"
+        logger.debug "total number single cp neighborhoods: #{pair.neighborhoods.select{|n| n.control_points.count == 1}.count}"
+        logger.debug "total number generated control points: #{pair.control_points.select(&:generated?).count}"
         pair.neighborhoods.each do |neighborhood|
           logger.debug neighborhood.info
           logger.debug "neighborhood: distance,pair_distance: #{neighborhood.distance},#{neighborhood.pair_distance} | total number of control points: #{neighborhood.control_points.count}"
@@ -133,7 +152,7 @@ module Panomosity
     end
 
     def to_s
-      pair.map(&:id)
+      pair.map(&:id).to_s.gsub(' ', '')
     end
 
     def info
@@ -181,7 +200,7 @@ module Panomosity
     end
 
     def good_control_points_to_keep(count: 3)
-      control_points_to_keep = good_neighborhoods_within_std(count: count).map(&:control_points_within_std).flatten.uniq { |cp| cp.raw }
+      control_points_to_keep = good_neighborhoods_within_std(count: count).map(&:control_points_within_std).flatten.uniq(&:raw)
 
       # Keep all our control points if we have less than 10
       if control_points.count >= 10

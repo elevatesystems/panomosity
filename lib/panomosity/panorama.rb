@@ -19,11 +19,16 @@ module Panomosity
       Pair.calculate_neighborhoods(self)
       control_points_to_keep = Pair.good_control_points_to_keep
       bad_control_points = control_points.reject { |cp| control_points_to_keep.map(&:raw).include?(cp.raw) }
-      control_point_ratio = bad_control_points.count.to_f / control_points.count
+      far_control_points = control_points.select { |cp| cp.prdist > 50 }
+      control_points_to_clean = (bad_control_points + far_control_points).uniq(&:raw)
+
+      # log warnings
+      control_point_ratio = control_points_to_clean.count.to_f / control_points.count
       logger.warn "Removing more than 30% (#{(control_point_ratio*100).round(4)}%) of control points. May potentially cause issues." if control_point_ratio >= 0.3
       control_point_pair_ratio = Pair.without_enough_control_points(ignore_connected: true).count.to_f / Pair.all.count
       logger.warn "More than 50% (#{(control_point_pair_ratio*100).round(4)}%) of pairs have fewer than 3 control points. May potentially cause issues." if control_point_pair_ratio >= 0.5
-      bad_control_points
+
+      control_points_to_clean
     end
 
     def fix_unconnected_image_pairs
@@ -122,6 +127,9 @@ module Panomosity
           control_point[:x] += i.w * 0.25
           control_point[:X] += i.w * 0.25
         end
+        # marks the control point as generated
+
+        control_point[:g] = 0
         control_point.to_s
       end.join
     end
