@@ -19,8 +19,8 @@ module Panomosity
       Pair.calculate_neighborhoods(self)
       control_points_to_keep = Pair.good_control_points_to_keep
       bad_control_points = control_points.reject { |cp| control_points_to_keep.map(&:raw).include?(cp.raw) }
-      far_control_points = control_points.select { |cp| cp.prdist > 50 }
-      control_points_to_clean = (bad_control_points + far_control_points).uniq(&:raw)
+      # far_control_points = control_points.select { |cp| cp.prdist > 50 }
+      control_points_to_clean = bad_control_points.uniq(&:raw)
 
       # log warnings
       control_point_ratio = control_points_to_clean.count.to_f / control_points.count
