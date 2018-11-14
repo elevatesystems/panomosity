@@ -7,6 +7,7 @@ module Panomosity
     def initialize(input, options = {})
       @input = input
       @options = options
+      @options[:verbosity] ||= 0
       @images = Image.parse(@input)
       @variable = PanoramaVariable.parse(@input).first
       ControlPoint.parse(@input)
@@ -139,6 +140,108 @@ module Panomosity
       Pair.calculate_neighborhood_groups
       Pair.info
       NeighborhoodGroup.info
+    end
+
+    def diagnose
+      Pair.calculate_neighborhoods(self)
+      Pair.calculate_neighborhood_groups
+
+      recommendations = []
+
+      logger.debug "total number of control points: #{control_points.count}"
+      logger.debug "total number of generated control points: #{control_points.select(&:generated?).count}"
+      logger.debug "total number of not generated control points: #{control_points.select(&:not_generated?).count}"
+
+      control_point_pair_ratio = Pair.without_enough_control_points(ignore_connected: true).count.to_f / Pair.all.count
+      logger.warn "More than 50% (#{(control_point_pair_ratio*100).round(4)}%) of pairs have fewer than 3 control points. May potentially cause issues." if control_point_pair_ratio >= 0.5
+
+      control_point_generated_ratio = control_points.select(&:generated?).count.to_f / control_points.select(&:not_generated?).count
+      if control_point_generated_ratio >= 0.3
+        message = <<~MESSAGE
+          More than 30% (#{(control_point_generated_ratio*100).round(4)}%) control points were generated.
+          This indicates a failure to find control points between images pairs due to poor lighting or insufficient complexity.
+        MESSAGE
+        logger.warn message
+      end
+
+      # neighborhood group tests
+      group_count = NeighborhoodGroup.horizontal.count
+      if group_count < 5
+        message = <<~MESSAGE
+          Total number of horizontal neighborhood groups is #{group_count} which is very low.
+          This can mean either low variation in control points distances or that not enough control points could be found.
+        MESSAGE
+        logger.warn message
+      end
+
+      group_std_avg = calculate_average(values: NeighborhoodGroup.horizontal[0..4].map(&:prdist_std))
+      if group_std_avg > 1.0
+        message = <<~MESSAGE
+          The standard deviation of distances in the top 5 horizontal neighborhood groups is #{group_std_avg} which is high.
+          The standard deviation implies that control points neighborhoods making up this group can vary more than 1.0 in distance.
+          On highly optimized images (with many good control points) this standard deviation should be near 0.
+          This could mean that even after optimization, there may be a seam on an individual pair.
+          This also means that the images may represent a 3D object that has perspective differences.
+        MESSAGE
+        logger.warn message
+      end
+
+      group_control_points = NeighborhoodGroup.horizontal.first.control_points.count
+      total_control_points = Pair.horizontal.map(&:control_points).flatten.uniq(&:raw).count
+      group_control_point_ratio = group_control_points.to_f / total_control_points
+      if group_control_point_ratio < 0.2
+        message = <<~MESSAGE
+          Less than 20% (#{(group_control_point_ratio*100).round(4)}%) of horizontal control points in the best
+          horizontal neighborhood group (#{group_control_points}) make up the total number of horizontal control points (#{total_control_points}).
+          This means panosmosity failed to find a neighborhood group that would include enough similarities between control point distances.
+          There will very likely be seams horizontally.
+        MESSAGE
+        logger.warn message
+        recommendations << 'horizontal'
+      end
+
+      group_count = NeighborhoodGroup.vertical.count
+      if group_count < 5
+        message = <<~MESSAGE
+          Total number of vertical neighborhood groups is #{group_count} which is very low.
+          This can mean either low variation in control points distances or that not enough control points could be found.
+        MESSAGE
+        logger.warn message
+      end
+
+      group_std_avg = calculate_average(values: NeighborhoodGroup.vertical[0..4].map(&:prdist_std))
+      if group_std_avg > 1.0
+        message = <<~MESSAGE
+          The standard deviation of distances in the top 5 vertical neighborhood groups is #{group_std_avg} which is high.
+          The standard deviation implies that control points neighborhoods making up this group can vary more than 1.0 in distance.
+          On highly optimized images (with many good control points) this standard deviation should be near 0.
+          This could mean that even after optimization, there may be a seam on an individual pair.
+          This also means that the images may represent a 3D object that has perspective differences.
+        MESSAGE
+        logger.warn message
+      end
+
+      group_control_points = NeighborhoodGroup.vertical.first.control_points.count
+      total_control_points = Pair.vertical.map(&:control_points).flatten.uniq(&:raw).count
+      group_control_point_ratio = group_control_points.to_f / total_control_points
+      if group_control_point_ratio < 0.2
+        message = <<~MESSAGE
+          Less than 20% (#{(group_control_point_ratio*100).round(4)}%) of vertical control points in the best
+          vertical neighborhood group (#{group_control_points}) make up the total number of vertical control points (#{total_control_points}).
+          This means panosmosity failed to find a neighborhood group that would include enough similarities between control point distances.
+          There will very likely be seams vertically.
+        MESSAGE
+        logger.warn message
+        recommendations << 'vertical'
+      end
+
+      if recommendations.empty?
+        logger.warn 'No recommendations'
+        puts 'none'
+      else
+        logger.warn 'Recommendations are to regenerate with control points generated from calibration cards:'
+        puts recommendations.join(',')
+      end
     end
   end
 end

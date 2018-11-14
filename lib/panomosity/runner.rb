@@ -13,6 +13,7 @@ module Panomosity
       convert_horizontal_lines
       convert_translation_parameters
       crop_centers
+      diagnose
       fix_conversion_errors
       fix_unconnected_image_pairs
       generate_border_line_control_points
@@ -39,7 +40,7 @@ module Panomosity
       @compare_file = File.new(@compare, 'r').read if @compare
       @logger = Panomosity.logger
 
-      if options[:verbose] || options[:very_verbose]
+      if options[:verbose] || options[:verbosity] > 0
         @logger.level = Logger::DEBUG
       else
         @logger.level = Logger::INFO
@@ -233,6 +234,12 @@ module Panomosity
       save_file
     end
 
+    def diagnose
+      logger.info 'diagnosing errors'
+      panorama = Panorama.new(@input_file, @options)
+      panorama.diagnose
+    end
+
     def fix_conversion_errors
       logger.info 'fixing conversion errors'
       @lines = @input_file.each_line.map do |line|
@@ -249,7 +256,7 @@ module Panomosity
 
     def fix_unconnected_image_pairs
       logger.info 'fixing unconnected image pairs'
-      panorama = Panorama.new(@input_file)
+      panorama = Panorama.new(@input_file, @options)
       @lines = panorama.fix_unconnected_image_pairs
       save_file
     end
@@ -466,7 +473,7 @@ module Panomosity
 
     def optimize
       logger.info 'optimizing'
-      panorama = Panorama.new(@input_file)
+      panorama = Panorama.new(@input_file, @options)
       optimizer = Optimizer.new(panorama)
       optimizer.run
 

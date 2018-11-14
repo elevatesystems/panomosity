@@ -113,8 +113,8 @@ module Panomosity
     def calculate_average_distance
       Pair.calculate_neighborhoods(panorama)
       Pair.calculate_neighborhood_groups
-      horizontal_distances = NeighborhoodGroup.horizontal.map(&:prdist_avg)
-      vertical_distances = NeighborhoodGroup.vertical.map(&:prdist_avg)
+      horizontal_distances = NeighborhoodGroup.horizontal[0..4].map(&:prdist_avg)
+      vertical_distances = NeighborhoodGroup.vertical[0..4].map(&:prdist_avg)
       calculate_average(values: horizontal_distances + vertical_distances)
     end
 

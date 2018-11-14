@@ -90,7 +90,7 @@ module Panomosity
     end
 
     def self.log_detailed_neighborhood_info(name: :horizontal, pairs: [])
-      return unless @panorama.options[:very_verbose]
+      return unless @panorama.options[:verbosity] > 1
       logger.debug "showing #{name} pair information"
       pair = pairs.max_by { |p| p.control_points_of_best_neighborhood.count }
       logger.debug "best #{name} pair #{pair.to_s} found #{pair.control_points_of_best_neighborhood.count} control points"

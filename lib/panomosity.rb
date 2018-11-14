@@ -58,8 +58,8 @@ module Panomosity
         options[:verbose] = v
       end
 
-      parser.on('-vv', '--vverbose', 'Run very verbosely') do |v|
-        options[:very_verbose] = v
+      parser.on('--verbosity LEVEL', Integer, 'Set verbosity level') do |v|
+        options[:verbosity] = v
       end
 
       parser.on('-h', '--help', 'Display this screen') do
@@ -70,6 +70,8 @@ module Panomosity
       parser.parse!(arguments)
     end
 
+    # default options
+    options[:verbosity] ||= 0
     runner = Runner.new(options)
     runner.run(ARGV[0])
   end

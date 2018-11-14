@@ -84,7 +84,7 @@ module Panomosity
         logger.debug "#{ng.prdist_avg} #{ng.prdist_std} #{ng.control_points.count} x#{ng.x_avg} y#{ng.y_avg}"
       end
 
-      self.neighborhood_groups = neighborhood_groups.max_by(5) { |ng| ng.control_points.count }
+      self.neighborhood_groups = neighborhood_groups.sort_by { |ng| -ng.control_points.count }
     end
 
     def self.info
