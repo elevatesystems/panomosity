@@ -99,11 +99,25 @@ module Panomosity
     def calculate
       @neighborhoods = total_neighborhoods.select { |n| (n.prdist_avg - center.prdist_avg).abs <= center.prdist_std }
       @control_points = neighborhoods.map(&:control_points_within_std).flatten.uniq(&:raw)
-      @x_avg = calculate_average(values: control_points.map(&:px))
-      @y_avg = calculate_average(values: control_points.map(&:py))
+      @x_avg = calculate_average(values: control_points.map(&:prx))
+      @y_avg = calculate_average(values: control_points.map(&:pry))
       @prdist_avg = center.prdist_avg
       @prdist_std = center.prdist_std
       self
+    end
+
+    def serialize
+      delta_cp_x = calculate_average(values: control_points.map { |cp| cp.x2 - cp.x1 })
+      delta_cp_y = calculate_average(values: control_points.map { |cp| cp.y2 - cp.y1 })
+      {
+        x_avg: x_avg,
+        y_avg: y_avg,
+        prdist_avg: prdist_avg,
+        prdist_std: prdist_std,
+        cp_count: control_points.count,
+        delta_cp_x: delta_cp_x,
+        delta_cp_y: delta_cp_y
+      }
     end
   end
 end

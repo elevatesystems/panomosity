@@ -7,6 +7,7 @@ module Panomosity
     attr_reader :logger
 
     AVAILABLE_COMMANDS = %w(
+      add_calibration_flag
       check_position_changes
       clean_control_points
       convert_equaled_image_parameters
@@ -34,10 +35,11 @@ module Panomosity
       @output = options[:output]
       @csv = options[:csv]
       @compare = options[:compare]
+      @report = options[:report]
       @input_file = File.new(@input, 'r').read rescue puts('You must have at least one argument')
       @output_file = File.new(@output, 'w') if @output
       @csv_file = File.new(@csv, 'r').read if @csv
-      @compare_file = File.new(@compare, 'r').read if @compare
+      @report_file = File.new(@report, 'r').read if @report
       @logger = Panomosity.logger
 
       if options[:verbose] || options[:verbosity] > 0
@@ -53,6 +55,12 @@ module Panomosity
       else
         logger.info "commands include:\n#{AVAILABLE_COMMANDS.join("\n")}"
       end
+    end
+
+    def add_calibration_flag
+      logger.info 'adding panomosity calibration flag'
+      @lines = @input_file.each_line.map { |line| line } + ["#panomosity calibration true\n"]
+      save_file
     end
 
     def check_position_changes

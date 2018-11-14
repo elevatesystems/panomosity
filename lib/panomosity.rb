@@ -38,6 +38,10 @@ module Panomosity
         options[:compare] = pto
       end
 
+      parser.on('-r', '--report [REPORT]', 'Include a report (when adding calibration control points)') do |report|
+        options[:report] = report
+      end
+
       parser.on('--without-cropping', 'Do not crop when running "crop_centers" (usually when the original run failed)') do |wc|
         options[:without_cropping] = wc
       end

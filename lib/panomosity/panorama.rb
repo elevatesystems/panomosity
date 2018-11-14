@@ -1,3 +1,5 @@
+require 'json'
+
 module Panomosity
   class Panorama
     include Panomosity::Utils
@@ -147,13 +149,21 @@ module Panomosity
       Pair.calculate_neighborhood_groups
 
       recommendations = []
+      messages = []
 
       logger.debug "total number of control points: #{control_points.count}"
       logger.debug "total number of generated control points: #{control_points.select(&:generated?).count}"
       logger.debug "total number of not generated control points: #{control_points.select(&:not_generated?).count}"
 
       control_point_pair_ratio = Pair.without_enough_control_points(ignore_connected: true).count.to_f / Pair.all.count
-      logger.warn "More than 50% (#{(control_point_pair_ratio*100).round(4)}%) of pairs have fewer than 3 control points. May potentially cause issues." if control_point_pair_ratio >= 0.5
+      if control_point_pair_ratio >= 0.5
+        message = <<~MESSAGE
+          More than 50% (#{(control_point_pair_ratio*100).round(4)}%) of pairs have fewer than 3 control points.
+          May potentially cause issues.
+        MESSAGE
+        logger.warn message
+        messages << message
+      end
 
       control_point_generated_ratio = control_points.select(&:generated?).count.to_f / control_points.select(&:not_generated?).count
       if control_point_generated_ratio >= 0.3
@@ -162,6 +172,7 @@ module Panomosity
           This indicates a failure to find control points between images pairs due to poor lighting or insufficient complexity.
         MESSAGE
         logger.warn message
+        messages << message
       end
 
       # neighborhood group tests
@@ -172,6 +183,7 @@ module Panomosity
           This can mean either low variation in control points distances or that not enough control points could be found.
         MESSAGE
         logger.warn message
+        messages << message
       end
 
       group_std_avg = calculate_average(values: NeighborhoodGroup.horizontal[0..4].map(&:prdist_std))
@@ -184,6 +196,7 @@ module Panomosity
           This also means that the images may represent a 3D object that has perspective differences.
         MESSAGE
         logger.warn message
+        messages << message
       end
 
       group_control_points = NeighborhoodGroup.horizontal.first.control_points.count
@@ -197,6 +210,7 @@ module Panomosity
           There will very likely be seams horizontally.
         MESSAGE
         logger.warn message
+        messages << message
         recommendations << 'horizontal'
       end
 
@@ -207,6 +221,7 @@ module Panomosity
           This can mean either low variation in control points distances or that not enough control points could be found.
         MESSAGE
         logger.warn message
+        messages << message
       end
 
       group_std_avg = calculate_average(values: NeighborhoodGroup.vertical[0..4].map(&:prdist_std))
@@ -219,6 +234,7 @@ module Panomosity
           This also means that the images may represent a 3D object that has perspective differences.
         MESSAGE
         logger.warn message
+        messages << message
       end
 
       group_control_points = NeighborhoodGroup.vertical.first.control_points.count
@@ -235,6 +251,28 @@ module Panomosity
         recommendations << 'vertical'
       end
 
+      logger.info 'creating diagnostic_report.json'
+
+      pair = Pair.horizontal.first
+      delta_d = pair.first_image.d - pair.last_image.d
+      roll = pair.first_image.r
+      pair = Pair.vertical.first
+      delta_e = pair.first_image.e - pair.last_image.e
+
+      diagnostic_report = {
+        messages: messages,
+        recommendations: recommendations,
+        data: {
+          delta_d: delta_d,
+          delta_e: delta_e,
+          roll: roll,
+          horizontal: NeighborhoodGroup.horizontal.first.serialize,
+          vertical: NeighborhoodGroup.vertical.first.serialize
+        }
+      }
+
+      File.open('diagnostic_report.json', 'w+') { |f| f.puts diagnostic_report.to_json }
+
       if recommendations.empty?
         logger.warn 'No recommendations'
         puts 'none'
@@ -242,6 +280,10 @@ module Panomosity
         logger.warn 'Recommendations are to regenerate with control points generated from calibration cards:'
         puts recommendations.join(',')
       end
+    end
+
+    def calibration?
+      !!@input.split(/\n/).find { |line| '#panomosity calibration true' }
     end
   end
 end

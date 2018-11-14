@@ -50,6 +50,7 @@ module Panomosity
           next if column == columns.last
           image_1 = images.find { |i| i.row == row && i.column == column }
           image_2 = images.find { |i| i.row == row && i.column == column.next }
+          next if @panorama.calibration? && (image_1.nil? || image_2.nil?)
           control_points = @panorama.control_points.select { |cp| [cp.n1, cp.n2].sort == [image_1.id, image_2.id].sort }
           @pairs << Pair.new([image_1, image_2].sort_by(&:id), control_points: control_points, type: :horizontal)
         end
@@ -61,6 +62,7 @@ module Panomosity
           next if row == rows.last
           image_1 = images.find { |i| i.column == column && i.row == row }
           image_2 = images.find { |i| i.column == column && i.row == row.next }
+          next if @panorama.calibration? && (image_1.nil? || image_2.nil?)
           control_points = @panorama.control_points.select { |cp| [cp.n1, cp.n2].sort == [image_1.id, image_2.id].sort }
           @pairs << Pair.new([image_1, image_2].sort_by(&:id), control_points: control_points, type: :vertical)
         end
