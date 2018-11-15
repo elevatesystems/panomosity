@@ -39,6 +39,7 @@ module Panomosity
       @input_file = File.new(@input, 'r').read rescue puts('You must have at least one argument')
       @output_file = File.new(@output, 'w') if @output
       @csv_file = File.new(@csv, 'r').read if @csv
+      @compare_file = File.new(@compare, 'r').read if @compare
       @report_file = File.new(@report, 'r').read if @report
       @logger = Panomosity.logger
 
