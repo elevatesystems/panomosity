@@ -207,8 +207,8 @@ module Panomosity
       # Keep all our control points if we have less than 10
       if control_points.count >= 10
         ratio = control_points_to_keep.count.to_f / control_points.count
-        if ratio < 0.5
-          Panomosity.logger.warn "#{to_s} keeping less than 50% (#{(ratio*100).round(4)}%) of #{control_points.count} control points. Reverting and keeping all control points"
+        if ratio < 0.2
+          Panomosity.logger.warn "#{to_s} keeping less than 20% (#{(ratio*100).round(4)}%) of #{control_points.count} control points. Reverting and keeping all control points"
           control_points
         else
           control_points_to_keep
