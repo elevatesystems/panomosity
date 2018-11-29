@@ -25,7 +25,11 @@ module Panomosity
       end
     end
 
-    def run_position_optimizer
+    def run_position_optimizer(xh_avg: nil, yh_avg: nil, xv_avg: nil, yv_avg: nil)
+      if xh_avg || yh_avg || xv_avg || yv_avg
+        logger.info "applying custom values of xh_avg: #{xh_avg}, yh_avg: #{yh_avg}, xv_avg: #{xv_avg}, yv_avg: #{yv_avg}"
+      end
+
       Pair.calculate_neighborhoods(panorama)
       Pair.calculate_neighborhood_groups
 
@@ -33,8 +37,8 @@ module Panomosity
       es = images.map(&:e).uniq.sort
 
       # get the average error for the best neighborhood group
-      x_avg = NeighborhoodGroup.horizontal.first.x_avg
-      y_avg = NeighborhoodGroup.vertical.first.y_avg
+      x_avg = xh_avg || NeighborhoodGroup.horizontal.first.x_avg
+      y_avg = yv_avg || NeighborhoodGroup.vertical.first.y_avg
 
       # start horizontally
       d_map = {}
@@ -51,8 +55,8 @@ module Panomosity
       logger.debug "created e_map #{e_map}"
 
       # add in the other offset
-      x_avg = NeighborhoodGroup.vertical.first.x_avg
-      y_avg = NeighborhoodGroup.horizontal.first.y_avg
+      x_avg = xv_avg || NeighborhoodGroup.vertical.first.x_avg
+      y_avg = yh_avg || NeighborhoodGroup.horizontal.first.y_avg
 
       de_map = {}
       d_map.each_with_index do |(dk,dv),di|
@@ -73,10 +77,19 @@ module Panomosity
       end
     end
 
-    def run_roll_optimizer
+    def run_roll_optimizer(apply_roll: nil)
       r = images.map(&:r).first
       original_roll = r
       logger.debug "current roll #{r}"
+
+      if apply_roll
+        logger.info "apply rolling custom roll #{apply_roll}"
+        images.each do |image|
+          image.r = apply_roll
+        end
+        return
+      end
+
       # we grab the top 5 neighborhood groups and get the average distance for them and average that
       dist_avg = calculate_average_distance
 

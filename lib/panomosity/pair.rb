@@ -8,7 +8,7 @@ module Panomosity
     attr_accessor :pair, :control_points, :neighborhoods, :type
 
     class << self
-      attr_accessor :logger
+      attr_accessor :panorama, :logger
 
       def horizontal
         @horizontal_pairs
@@ -22,8 +22,8 @@ module Panomosity
         @pairs
       end
 
-      def good_control_points_to_keep
-        @pairs.map(&:good_control_points_to_keep).flatten.uniq(&:raw)
+      def good_control_points_to_keep(count: 3)
+        @pairs.map { |pair| pair.good_control_points_to_keep(count: count) }.flatten.uniq(&:raw)
       end
 
       def unconnected

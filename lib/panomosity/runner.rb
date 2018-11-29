@@ -1,4 +1,5 @@
 require 'logger'
+require 'json'
 
 module Panomosity
   class Runner
@@ -8,11 +9,13 @@ module Panomosity
 
     AVAILABLE_COMMANDS = %w(
       add_calibration_flag
+      apply_calibration_values
       check_position_changes
       clean_control_points
       convert_equaled_image_parameters
       convert_horizontal_lines
       convert_translation_parameters
+      create_calibration_report
       crop_centers
       diagnose
       fix_conversion_errors
@@ -20,7 +23,7 @@ module Panomosity
       generate_border_line_control_points
       get_columns_and_rows
       get_control_point_info
-      get_neigborhood_info
+      get_neighborhood_info
       merge_image_parameters
       nona_grid
       optimize
@@ -61,6 +64,37 @@ module Panomosity
     def add_calibration_flag
       logger.info 'adding panomosity calibration flag'
       @lines = @input_file.each_line.map { |line| line } + ["#panomosity calibration true\n"]
+      save_file
+    end
+
+    def apply_calibration_values
+      logger.info "applying calibration values from #{@report}"
+      panorama = Panorama.new(@input_file, @options)
+      optimizer = Optimizer.new(panorama)
+      calibration_report = JSON.parse(@report_file)
+
+      if calibration_report.fetch('position')
+        logger.info 'calibration_report.json included position, applying position values'
+        optimizer.run_position_optimizer(xh_avg: calibration_report['position']['xh_avg'],
+                                         yh_avg: calibration_report['position']['yh_avg'],
+                                         xv_avg: calibration_report['position']['xv_avg'],
+                                         yv_avg: calibration_report['position']['yv_avg'])
+      end
+
+      if calibration_report.fetch('roll')
+        logger.info 'calibration_report.json included roll, applying roll values'
+        optimizer.run_roll_optimizer(apply_roll: calibration_report.fetch('roll'))
+      end
+
+      @lines = @input_file.each_line.map do |line|
+        image = optimizer.images.find { |i| i.raw == line }
+        if image
+          image.to_s
+        else
+          next line
+        end
+      end.compact
+
       save_file
     end
 
@@ -173,6 +207,12 @@ module Panomosity
       end.compact
 
       save_file
+    end
+
+    def create_calibration_report
+      logger.info "creating #{@options[:report_type]} calibration report"
+      panorama = Panorama.new(@input_file, @options)
+      panorama.create_calibration_report
     end
 
     # Uses image magick to crop centers
@@ -413,10 +453,10 @@ module Panomosity
       end
     end
 
-    def get_neigborhood_info
+    def get_neighborhood_info
       logger.info 'getting detailed neighborhood info'
       panorama = Panorama.new(@input_file, @options)
-      panorama.get_neigborhood_info
+      panorama.get_neighborhood_info
     end
 
     def merge_image_parameters

@@ -66,6 +66,10 @@ module Panomosity
         options[:verbosity] = v
       end
 
+      parser.on('--report-type TYPE', 'Type of report to create (only when running create_calibration_report)') do |type|
+        options[:report_type] = type
+      end
+
       parser.on('-h', '--help', 'Display this screen') do
         puts parser
         exit

@@ -19,8 +19,12 @@ module Panomosity
     end
 
     def clean_control_points
-      Pair.calculate_neighborhoods(self)
-      control_points_to_keep = Pair.good_control_points_to_keep
+      if calibration?
+        Pair.calculate_neighborhoods(self, distance: 30)
+      else
+        Pair.calculate_neighborhoods(self, distance: 100)
+      end
+      control_points_to_keep = Pair.good_control_points_to_keep(count: 2)
       bad_control_points = control_points.reject { |cp| control_points_to_keep.map(&:raw).include?(cp.raw) }
       # far_control_points = control_points.select { |cp| cp.prdist > 50 }
       control_points_to_clean = bad_control_points.uniq(&:raw)
@@ -37,7 +41,11 @@ module Panomosity
     def fix_unconnected_image_pairs
       logger.info 'finding unconnected image pairs'
 
-      Pair.calculate_neighborhoods(self)
+      if calibration?
+        Pair.calculate_neighborhoods(self, distance: 30)
+      else
+        Pair.calculate_neighborhoods(self, distance: 100)
+      end
       Pair.calculate_neighborhood_groups
 
       unconnected_image_pairs = Pair.unconnected
@@ -137,7 +145,7 @@ module Panomosity
       end.join
     end
 
-    def get_neigborhood_info
+    def get_neighborhood_info
       Pair.calculate_neighborhoods(self)
       Pair.calculate_neighborhood_groups
       Pair.info
@@ -280,6 +288,42 @@ module Panomosity
         logger.warn 'Recommendations are to regenerate with control points generated from calibration cards:'
         puts recommendations.join(',')
       end
+    end
+
+    def create_calibration_report
+      # create a file if one doesn't exist
+      filename = 'calibration_report.json'
+      unless File.file?(filename)
+        logger.info 'creating calibration_report.json since one does not exist'
+        File.open(filename, 'w+') { |f| f.puts '{}' }
+      end
+
+      calibration_report = JSON.parse(File.read(filename))
+
+      if @options[:report_type] == 'position'
+        if calibration?
+          Pair.calculate_neighborhoods(self, distance: 30)
+        else
+          Pair.calculate_neighborhoods(self, distance: 100)
+        end
+        Pair.calculate_neighborhood_groups
+
+        xh_avg = NeighborhoodGroup.horizontal.first.x_avg
+        yh_avg = NeighborhoodGroup.horizontal.first.y_avg
+        xv_avg = NeighborhoodGroup.vertical.first.x_avg
+        yv_avg = NeighborhoodGroup.vertical.first.y_avg
+        calibration_report['position'] = {
+          xh_avg: xh_avg,
+          yh_avg: yh_avg,
+          xv_avg: xv_avg,
+          yv_avg: yv_avg
+        }
+      else
+        calibration_report['roll'] = images.first.r
+      end
+
+      logger.info 'writing calibration_report.json'
+      File.open(filename, 'w+') { |f| f.puts calibration_report.to_json }
     end
 
     def calibration?

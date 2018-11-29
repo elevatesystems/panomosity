@@ -34,8 +34,17 @@ module Panomosity
       @prx_avg, @prx_std = *calculate_average_and_std(values: control_points.map(&:prx), ignore_empty: true)
       @pry_avg, @pry_std = *calculate_average_and_std(values: control_points.map(&:pry), ignore_empty: true)
 
-      # add in control points that have similar distances (within std)
-      @control_points_within_std = pair_control_points.select { |c| c.prdist.between?(center.prdist - prdist_std, center.prdist + prdist_std) }
+
+      if Pair.panorama.calibration? && @control_points.count == 2
+        # If we are viewing calibration control points we are going to have fewer of them. Increase the standard
+        # deviation so that more control points are included
+        std = prdist_std * 4
+        @control_points_within_std = pair_control_points.select { |c| c.prdist.between?(center.prdist - std, center.prdist + std) }
+      else
+        # add in control points that have similar distances (within std)
+        @control_points_within_std = pair_control_points.select { |c| c.prdist.between?(center.prdist - prdist_std, center.prdist + prdist_std) }
+      end
+
       self
     end
 
