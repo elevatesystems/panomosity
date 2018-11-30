@@ -515,7 +515,7 @@ module Panomosity
         end.compact
         save_file
         logger.debug "running nona #{@output}"
-        output = `nona --save-intermediate-images --intermediate-suffix=intermediate -v -m TIFF_m --seam=blend #{@output} -o #{res}_res_stitch_section_c#{column}_`
+        output = `nona --save-intermediate-images --intermediate-suffix=intermediate -v -m TIFF_m --seam=blend #{@output} -o #{res}_res_stitch_section_c#{column.to_s.rjust(5, '0')}_`
         logger.debug output
       end
     end

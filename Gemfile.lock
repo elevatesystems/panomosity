@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    panomosity (0.1.27)
+    panomosity (0.1.28)
 
 GEM
   remote: https://rubygems.org/
