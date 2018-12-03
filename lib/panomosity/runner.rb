@@ -544,10 +544,17 @@ module Panomosity
       images = Image.parse(@input_file)
       ds = images.map(&:d).uniq.sort
       es = images.map(&:e).uniq.sort
+
+      # within two pixels of each other
+      d_groups = ds.map { |d| ds.select { |n| n.between?(d-2, d+2) }.sort }
+      e_groups = es.map { |e| es.select { |n| n.between?(e-2, e+2) }.sort }
+
       fov = images.map(&:v).uniq.find { |v| v != 0.0 }
       images.each do |i|
+        column = d_groups.reverse.index { |group| group.include?(i.d) }
+        row = e_groups.reverse.index { |group| group.include?(i.e) }
         i[:original_n] = i.n
-        i.n = "c#{ds.reverse.index(i.d)}_r#{es.reverse.index(i.e)}.jpg"
+        i.n = "c#{column}_r#{row}.jpg"
         i.v = fov
       end
       images = images.sort_by { |image| [image.column, image.row] }
