@@ -93,25 +93,32 @@ module Panomosity
       # we grab the top 5 neighborhood groups and get the average distance for them and average that
       dist_avg = calculate_average_distance
 
-      r -= 0.05
+      r -= 0.01
       logger.debug "current roll #{r}"
       new_dist_avg = recalculate_average_distance(roll: r)
       logger.debug "avg: #{dist_avg} new_avg: #{new_dist_avg}"
 
+      operation_map = { :- => 'subtracting', :+ => 'adding' }
       if new_dist_avg < dist_avg
-        logger.debug 'found that subtracting roll will decrease distances, resetting roll...'
         operation = :-
+        logger.debug "found that #{operation_map[operation]} roll will decrease distances, resetting roll..."
       else
-        logger.debug 'found that adding roll will decrease distances, resetting roll...'
         operation = :+
+        logger.debug "found that #{operation_map[operation]} roll will decrease distances, resetting roll..."
         r = original_roll
-        r += 0.05
+        r += 0.01
         logger.debug "current roll #{r}"
         new_dist_avg = recalculate_average_distance(roll: r)
       end
 
+      logger.debug "avg: #{dist_avg} new_avg: #{new_dist_avg}"
+      if new_dist_avg > dist_avg
+        logger.debug "found that #{operation_map[operation]} roll will also increase distances, leaving roll unchanged "
+        r = original_roll
+      end
+
       while new_dist_avg <= dist_avg
-        r = r.send(operation, 0.05)
+        r = r.send(operation, 0.01)
         logger.debug "current roll #{r}"
         dist_avg = new_dist_avg
         new_dist_avg = recalculate_average_distance(roll: r)
