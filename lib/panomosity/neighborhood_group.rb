@@ -6,7 +6,7 @@ module Panomosity
     extend Panomosity::Utils
 
     attr_accessor :center, :total_neighborhoods, :neighborhoods, :control_points, :prdist_avg, :prdist_std, :x_avg,
-                  :y_avg
+                  :rx_avg, :y_avg, :ry_avg
 
     class << self
       attr_accessor :logger
@@ -81,7 +81,7 @@ module Panomosity
       end
 
       neighborhood_groups.max_by(5) { |ng| ng.control_points.count }.each do |ng|
-        logger.debug "#{ng.prdist_avg} #{ng.prdist_std} #{ng.control_points.count} x#{ng.x_avg} y#{ng.y_avg}"
+        logger.debug "#{ng.prdist_avg} #{ng.prdist_std} #{ng.control_points.count} x#{ng.x_avg} y#{ng.y_avg} rx#{ng.rx_avg} ry#{ng.ry_avg}"
       end
 
       self.neighborhood_groups = neighborhood_groups.sort_by { |ng| -ng.control_points.count }
@@ -100,9 +100,10 @@ module Panomosity
       @neighborhoods = total_neighborhoods.select { |n| (n.prdist_avg - center.prdist_avg).abs <= center.prdist_std }
       @control_points = neighborhoods.map(&:control_points_within_std).flatten.uniq(&:raw)
       @x_avg = calculate_average(values: control_points.map(&:px))
+      @rx_avg = calculate_average(values: control_points.map(&:prx))
       @y_avg = calculate_average(values: control_points.map(&:py))
-      @prdist_avg = center.prdist_avg
-      @prdist_std = center.prdist_std
+      @ry_avg = calculate_average(values: control_points.map(&:pry))
+      @prdist_avg, @prdist_std = *calculate_average_and_std(values: control_points.map(&:prdist))
       self
     end
 

@@ -4,7 +4,7 @@
 module Panomosity
   class ControlPoint
     @@attributes = %i(n N x y X Y t g)
-    @@calculated_attributes = %i(dist px py pdist prx pry prdist conn_type i1 i2)
+    @@calculated_attributes = %i(dist px py pdist prx pry prdist conn_type i1 i2 roll)
 
     def self.parse(pto_file, cp_type: nil, compact: false)
       @control_points = pto_file.each_line.map do |line|
@@ -66,12 +66,18 @@ module Panomosity
         cp.pdist = Math.sqrt(cp.px ** 2 + cp.py ** 2)
 
         # pixel distance including roll
+        cp.conn_type = image1.column == image2.column ? :vertical : :horizontal
         r = image1.r * Math::PI / 180
+
+        if cp.conn_type == :horizontal
+          cp.roll = Math.atan(-(cp.y2 - cp.y1) / (cp.x2 - cp.x1)) * 180.0 / Math::PI
+        else
+          cp.roll = Math.atan((cp.x2 - cp.x1) / (cp.y2 - cp.y1)) * 180.0 / Math::PI
+        end
         cp.prx = image1.d - image2.d + Math.cos(r) * (cp.x2 - cp.x1) - Math.sin(r) * (cp.y2 - cp.y1)
-        cp.pry = image1.e - image2.e + Math.cos(r) * (cp.y2 - cp.y1) - Math.sin(r) * (cp.x2 - cp.x1)
+        cp.pry = image1.e - image2.e + Math.cos(r) * (cp.y2 - cp.y1) + Math.sin(r) * (cp.x2 - cp.x1)
         cp.prdist = Math.sqrt(cp.prx ** 2 + cp.pry ** 2)
 
-        cp.conn_type = image1.column == image2.column ? :vertical : :horizontal
         cp.i1 = image1
         cp.i2 = image2
       end
@@ -189,6 +195,11 @@ module Panomosity
       self.prx = i1.d - i2.d + Math.cos(r) * (x2 - x1) - Math.sin(r) * (y2 - y1)
       self.pry = i1.e - i2.e + Math.cos(r) * (y2 - y1) - Math.sin(r) * (x2 - x1)
       self.prdist = Math.sqrt(prx ** 2 + pry ** 2)
+      if conn_type == :horizontal
+        self.roll = Math.atan(-(y2 - y1) / (x2 - x1)) * 180.0 / Math::PI
+      else
+        self.roll = Math.atan((x2 - x1) / (y2 - y1)) * 180.0 / Math::PI
+      end
     end
 
     def detailed_info

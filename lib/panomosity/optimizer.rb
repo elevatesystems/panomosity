@@ -90,6 +90,15 @@ module Panomosity
         return
       end
 
+      roll = calculate_estimated_roll
+      if roll
+        logger.debug "using calculated horizontal roll #{roll}"
+        images.each do |image|
+          image.r = roll
+        end
+        return
+      end
+
       # we grab the top 5 neighborhood groups and get the average distance for them and average that
       dist_avg = calculate_average_distance
 
@@ -142,6 +151,27 @@ module Panomosity
       panorama.images.each { |i| i.r = roll }
       panorama.control_points = ControlPoint.calculate_distances(panorama.images, panorama.variable)
       calculate_average_distance
+    end
+
+    def calculate_estimated_roll
+      return
+      # setting to 0
+      images.each do |image|
+        image.r = 0.0
+      end
+      Pair.calculate_neighborhoods(panorama)
+      Pair.calculate_neighborhood_groups
+      cps = NeighborhoodGroup.horizontal.first.control_points
+      avg, std = *calculate_average_and_std(values: cps.map(&:roll))
+      # 0.1 degrees of std
+      while std > 0.1
+        cps.select!{|c| (avg - c.roll).abs <= std}
+        avg, std = *calculate_average_and_std(values: cps.map(&:roll))
+      end
+      avg
+    rescue
+      logger.debug 'estimating roll failed'
+      nil
     end
   end
 end
