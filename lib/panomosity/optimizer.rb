@@ -30,15 +30,17 @@ module Panomosity
         logger.info "applying custom values of xh_avg: #{xh_avg}, yh_avg: #{yh_avg}, xv_avg: #{xv_avg}, yv_avg: #{yv_avg}"
       end
 
-      Pair.calculate_neighborhoods(panorama)
-      Pair.calculate_neighborhood_groups
+      unless xh_avg && yh_avg && xv_avg && yv_avg
+        Pair.calculate_neighborhoods(panorama)
+        Pair.calculate_neighborhood_groups
+      end
 
       ds = images.map(&:d).uniq.sort
       es = images.map(&:e).uniq.sort
 
       # get the average error for the best neighborhood group
-      x_avg = xh_avg || NeighborhoodGroup.horizontal.first.x_avg
-      y_avg = yv_avg || NeighborhoodGroup.vertical.first.y_avg
+      x_avg = xh_avg || NeighborhoodGroup.horizontal.first.rx_avg
+      y_avg = yv_avg || NeighborhoodGroup.vertical.first.ry_avg
 
       # start horizontally
       d_map = {}
@@ -55,8 +57,8 @@ module Panomosity
       logger.debug "created e_map #{e_map}"
 
       # add in the other offset
-      x_avg = xv_avg || NeighborhoodGroup.vertical.first.x_avg
-      y_avg = yh_avg || NeighborhoodGroup.horizontal.first.y_avg
+      x_avg = xv_avg || NeighborhoodGroup.vertical.first.rx_avg
+      y_avg = yh_avg || NeighborhoodGroup.horizontal.first.ry_avg
 
       de_map = {}
       d_map.each_with_index do |(dk,dv),di|

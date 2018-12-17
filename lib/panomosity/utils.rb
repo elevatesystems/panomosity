@@ -20,5 +20,15 @@ module Panomosity
       logger.debug "average #{name}: #{average_value}" if logger
       average_value
     end
+
+    def remove_outliers(method: :value, values: [], logger: nil)
+      avg, std = *calculate_average_and_std(values: values.map(&method))
+      while std >= 0.1
+        values.select! { |c| (avg - c.send(method)).abs <= std }
+        avg, std = *calculate_average_and_std(values: values.map(&method))
+        logger.debug [avg , std, values.count].to_s if logger
+      end
+      values
+    end
   end
 end

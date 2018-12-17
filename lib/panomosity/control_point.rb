@@ -4,7 +4,7 @@
 module Panomosity
   class ControlPoint
     @@attributes = %i(n N x y X Y t g)
-    @@calculated_attributes = %i(dist px py pdist prx pry prdist conn_type i1 i2 roll)
+    @@calculated_attributes = %i(dist px py pdist prx pry prdist conn_type i1 i2)
 
     def self.parse(pto_file, cp_type: nil, compact: false)
       @control_points = pto_file.each_line.map do |line|
@@ -55,31 +55,26 @@ module Panomosity
         distance = angle * radius
         cp.dist = distance
 
+        cp.i1 = image1
+        cp.i2 = image2
+
         # pixel distance
-        x1 = (image1.w / 2.0) - cp.x1 + image1.d
-        y1 = (image1.h / 2.0) - cp.y1 + image1.e
-        x2 = (image2.w / 2.0) - cp.x2 + image2.d
-        y2 = (image2.h / 2.0) - cp.y2 + image2.e
+        # NOTE d,e distances are highest on the top-left and lowest at the bottom-right
+        #      control point coordinates are highest on bottom-right and lowest on the top-left
+        x1 = (cp.i1.w / 2.0) - cp.x1 + cp.i1.d
+        y1 = (cp.i1.h / 2.0) - cp.y1 + cp.i1.e
+        x2 = (cp.i2.w / 2.0) - cp.x2 + cp.i2.d
+        y2 = (cp.i2.h / 2.0) - cp.y2 + cp.i2.e
 
         cp.px = x1 - x2
         cp.py = y1 - y2
         cp.pdist = Math.sqrt(cp.px ** 2 + cp.py ** 2)
 
         # pixel distance including roll
-        cp.conn_type = image1.column == image2.column ? :vertical : :horizontal
         r = image1.r * Math::PI / 180
-
-        if cp.conn_type == :horizontal
-          cp.roll = Math.atan(-(cp.y2 - cp.y1) / (cp.x2 - cp.x1)) * 180.0 / Math::PI
-        else
-          cp.roll = Math.atan((cp.x2 - cp.x1) / (cp.y2 - cp.y1)) * 180.0 / Math::PI
-        end
-        cp.prx = image1.d - image2.d + Math.cos(r) * (cp.x2 - cp.x1) - Math.sin(r) * (cp.y2 - cp.y1)
-        cp.pry = image1.e - image2.e + Math.cos(r) * (cp.y2 - cp.y1) + Math.sin(r) * (cp.x2 - cp.x1)
+        cp.prx = Math.cos(r) * cp.px - Math.sin(r) * cp.py
+        cp.pry = Math.cos(r) * cp.py + Math.sin(r) * cp.px
         cp.prdist = Math.sqrt(cp.prx ** 2 + cp.pry ** 2)
-
-        cp.i1 = image1
-        cp.i2 = image2
       end
     end
 
@@ -192,14 +187,9 @@ module Panomosity
 
     def recalculate_pixel_distance
       r = i1.r * Math::PI / 180
-      self.prx = i1.d - i2.d + Math.cos(r) * (x2 - x1) - Math.sin(r) * (y2 - y1)
-      self.pry = i1.e - i2.e + Math.cos(r) * (y2 - y1) - Math.sin(r) * (x2 - x1)
+      self.prx = Math.cos(r) * px - Math.sin(r) * py
+      self.pry = Math.cos(r) * py + Math.sin(r) * px
       self.prdist = Math.sqrt(prx ** 2 + pry ** 2)
-      if conn_type == :horizontal
-        self.roll = Math.atan(-(y2 - y1) / (x2 - x1)) * 180.0 / Math::PI
-      else
-        self.roll = Math.atan((x2 - x1) / (y2 - y1)) * 180.0 / Math::PI
-      end
     end
 
     def detailed_info
