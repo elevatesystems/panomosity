@@ -70,6 +70,10 @@ module Panomosity
         options[:report_type] = type
       end
 
+      parser.on('--darwin', 'Sets a flag to indicate the operating system') do |type|
+        options[:darwin] = type
+      end
+
       parser.on('-h', '--help', 'Display this screen') do
         puts parser
         exit
