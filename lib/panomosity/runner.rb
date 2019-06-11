@@ -73,7 +73,7 @@ module Panomosity
       optimizer = Optimizer.new(panorama)
       calibration_report = JSON.parse(@report_file)
 
-      if calibration_report.fetch('position')
+      if calibration_report.fetch('position', nil)
         logger.info 'calibration_report.json included position, applying position values'
         optimizer.run_position_optimizer(xh_avg: calibration_report['position']['xh_avg'],
                                          yh_avg: calibration_report['position']['yh_avg'],
@@ -81,7 +81,7 @@ module Panomosity
                                          yv_avg: calibration_report['position']['yv_avg'])
       end
 
-      if calibration_report.fetch('roll')
+      if calibration_report.fetch('roll', nil)
         logger.info 'calibration_report.json included roll, applying roll values'
         optimizer.run_roll_optimizer(apply_roll: calibration_report.fetch('roll'))
       end
