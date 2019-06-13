@@ -44,15 +44,21 @@ module Panomosity
 
       # start horizontally
       d_map = {}
+      d_range = (ds.count / 2.0).floor
+      d_center = ((-d_range)..d_range).to_a
+      d_center.delete(0) if ds.count.even?
       ds.each_with_index do |d, i|
-        d_map[d] = d + -x_avg * i
+        d_map[d] = d + -x_avg * d_center[i]
       end
       logger.debug "created d_map #{d_map}"
 
       # vertical
       e_map = {}
+      e_range = (es.count / 2.0).floor
+      e_center = ((-e_range)..e_range).to_a
+      e_center.delete(0) if es.count.even?
       es.each_with_index do |e, i|
-        e_map[e] = e + -y_avg * i
+        e_map[e] = e + -y_avg * e_center[i]
       end
       logger.debug "created e_map #{e_map}"
 
@@ -64,8 +70,8 @@ module Panomosity
       d_map.each_with_index do |(dk,dv),di|
         e_map.each_with_index do |(ek,ev),ei|
           de_map["#{dk},#{ek}"] = {}
-          de_map["#{dk},#{ek}"][:d] = dv + -x_avg * ei
-          de_map["#{dk},#{ek}"][:e] = ev + -y_avg * di
+          de_map["#{dk},#{ek}"][:d] = dv + -x_avg * e_center[ei]
+          de_map["#{dk},#{ek}"][:e] = ev + -y_avg * d_center[di]
         end
       end
       logger.debug "created de_map #{de_map}"
