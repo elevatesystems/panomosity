@@ -74,6 +74,11 @@ module Panomosity
         options[:darwin] = type
       end
 
+      parser.on('--version', 'Show the installed version') do
+        puts VERSION
+        exit
+      end
+
       parser.on('-h', '--help', 'Display this screen') do
         puts parser
         exit
