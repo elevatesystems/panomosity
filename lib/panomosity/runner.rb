@@ -1,5 +1,6 @@
 require 'logger'
 require 'json'
+require 'csv'
 
 module Panomosity
   class Runner
@@ -18,12 +19,14 @@ module Panomosity
       create_calibration_report
       crop_centers
       diagnose
+      export_control_point_csv
       fix_conversion_errors
       fix_unconnected_image_pairs
       generate_border_line_control_points
       get_columns_and_rows
       get_control_point_info
       get_neighborhood_info
+      import_control_point_csv
       merge_image_parameters
       nona_grid
       optimize
@@ -289,6 +292,25 @@ module Panomosity
       panorama.diagnose
     end
 
+    def export_control_point_csv
+      logger.info 'exporting control point csv'
+      panorama = Panorama.new(@input_file, @options)
+      Pair.calculate_neighborhoods(panorama, distance: 30)
+
+      filename = 'control_points.csv'
+      headers = %w(image_1_name image_2_name image_1_id image_2_id type width height d1 e1 d2 e2 x1 y1 x2 y2 rx ry r)
+      CSV.open(filename, 'w+') do |csv|
+        csv << headers
+        panorama.control_points.each do |cp|
+          pair = Pair.all.find { |p| p.control_points.include?(cp) }
+          csv << [cp.i1.name, cp.i2.name, cp.i1.id, cp.i2.id, pair.type, cp.i1.w, cp.i1.h, cp.i1.d, cp.i1.e,
+                  cp.i2.d, cp.i2.e, cp.x1, cp.y1, cp.x2, cp.y2, cp.px, cp.py, cp.pdist]
+        end
+      end
+
+      logger.info 'Done. Check for control_points.csv'
+    end
+
     def fix_conversion_errors
       logger.info 'fixing conversion errors'
       @lines = @input_file.each_line.map do |line|
@@ -457,6 +479,33 @@ module Panomosity
       logger.info 'getting detailed neighborhood info'
       panorama = Panorama.new(@input_file, @options)
       panorama.get_neighborhood_info
+    end
+
+    def import_control_point_csv
+      logger.info 'importing control point csv'
+      panorama = Panorama.new(@input_file, @options)
+
+      filename = @csv || 'control_points.csv'
+      csv = CSV.read(filename)
+      headers = csv.first
+      csv = csv[1..(csv.length - 1)]
+      data = csv.map { |s| Hash[headers.zip(s)] }
+
+      @lines = @input_file.each_line.map do |line|
+        cp = panorama.control_points.find { |c| c.raw == line }
+        if cp
+          kept_cp = data.find do |d|
+            cp.i1.id == d['image_1_id'].to_i && cp.i2.id == d['image_2_id'].to_i &&
+            cp.x1.round(4) == d['x1'].to_f.round(4) && cp.x2.round(4) == d['x2'].to_f.round(4) &&
+            cp.y1.round(4) == d['y1'].to_f.round(4) && cp.y2.round(4) == d['y2'].to_f.round(4)
+          end
+          cp.to_s if kept_cp
+        else
+          next line
+        end
+      end.compact
+
+      save_file
     end
 
     def merge_image_parameters
