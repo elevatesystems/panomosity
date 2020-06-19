@@ -60,5 +60,9 @@ module Panomosity
       line_values = @@attributes.map { |attribute| "#{attribute}#{self.send(attribute)}" }
       "p #{line_values.join(' ')}\n"
     end
+
+    def attributes
+      @attributes.keep_if { |k, _| !%i(raw).include?(k) }
+    end
   end
 end

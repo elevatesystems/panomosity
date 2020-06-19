@@ -196,8 +196,8 @@ module Panomosity
       "#{to_s.sub(/\n/, '')} dist #{dist.round(4)} pixel_dist #{px.round(4)},#{py.round(4)},#{pdist.round(4)} pixel_r_dist #{prx.round(4)},#{pry.round(4)},#{prdist.round(4)} conn_type #{conn_type}"
     end
 
-    def attributes
-      @attributes
+    def attributes(raw: false)
+      @attributes.keep_if { |k, _| raw || !%i(raw i1 i2).include?(k) }
     end
   end
 end

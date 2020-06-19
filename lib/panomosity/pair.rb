@@ -157,6 +157,10 @@ module Panomosity
       pair.map(&:id).to_s.gsub(' ', '')
     end
 
+    def ==(other)
+      to_s == other.to_s
+    end
+
     def info
       "#{to_s}(#{type}) image_1 d,e: #{pair.first.d},#{pair.first.e} | image_2 d,e: #{pair.last.d},#{pair.last.e}"
     end
@@ -224,6 +228,18 @@ module Panomosity
 
     def control_points_of_best_neighborhood
       best_neighborhood ? best_neighborhood.control_points : []
+    end
+
+    def attributes
+      x_avg, x_std = *calculate_average_and_std(values: control_points.map(&:px), ignore_empty: true)
+      y_avg, y_std = *calculate_average_and_std(values: control_points.map(&:py), ignore_empty: true)
+      dist_avg, dist_std = *calculate_average_and_std(values: control_points.map(&:pdist), ignore_empty: true)
+      i1 = control_points.first.n1
+      i2 = control_points.first.n2
+      {
+        id: [i1, i2], n: i1, N: i2, count: control_points.count, type: type,
+        x_avg: x_avg, x_std: x_std, y_avg: y_avg, y_std: y_std, dist_avg: dist_avg, dist_std: dist_std
+      }
     end
   end
 end

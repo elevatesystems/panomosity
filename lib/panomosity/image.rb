@@ -1,4 +1,4 @@
-# Exmaple of an image line
+# Example of an image line
 # i w2448 h3264 f0 v=0 Ra=0 Rb=0 Rc=0 Rd=0 Re=0 Eev6.433 Er1 Eb1 r0 p0 y0 TrX0.88957152 TrY0.79560269 TrZ1 Tpy0 Tpp0 j0 a=0 b=0 c=0 d=0 e=0 g0 t0 Va=0 Vb=0 Vc=0 Vd=0 Vx=0 Vy=0  Vm5 n"WZ8ppTx9PtcxASB3hbeeuS6Z"\n
 
 module Panomosity
@@ -166,6 +166,12 @@ module Panomosity
     def row
       return unless name =~ /c(\d+)_r(\d+)\.jpg/
       name.scan(/c(\d+)_r(\d+)\.jpg/).flatten.map(&:to_i).last
+    end
+
+    def attributes
+      attributes = @attributes.keep_if { |k, _| !%i(raw id).include?(k) }
+      attributes.merge!(column: column || 0, row: row || 0)
+      attributes
     end
   end
 end

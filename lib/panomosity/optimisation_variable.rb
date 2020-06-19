@@ -59,12 +59,12 @@ module Panomosity
     end
 
     def to_s
-      line_values = @@attributes.map { |attribute| "#{attribute}#{self.send(attribute)}" }
-      "v #{line_values.join(' ')}\n"
+      line_values = @@attributes.map { |attribute| "#{attribute}#{self.send(attribute)}" if self.send(attribute) }
+      "v #{line_values.compact.join(' ')}\n"
     end
 
     def attributes
-      @attributes.keep_if { |k,_| !%i(raw).include?(k) }
+      @attributes.keep_if { |k, _| !%i(raw).include?(k) }
     end
   end
 end

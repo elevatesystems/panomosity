@@ -104,7 +104,7 @@ module Panomosity
         end
       end
 
-      control_point = ControlPoint.new(group.center.center.attributes)
+      control_point = ControlPoint.new(group.center.center.attributes(raw: true))
 
       if pair
         control_point[:n] = pair.first_image.id
@@ -340,6 +340,26 @@ module Panomosity
       end.compact
 
       File.open(filename, 'w') { |f| lines.each { |line| f.puts line } }
+    end
+
+    def attributes
+      GeneralizedNeighborhood.calculate_all(panorama: self, options: @options)
+      control_points = control_points.dup
+      control_points.each_with_index { |cp, i| cp[:id] = i }
+      neighborhoods = GeneralizedNeighborhood.neighborhoods.dup
+      neighborhoods.each_with_index { |n, i| n.id = i }
+      types = %i(horizontal vertical)
+      similar_neighborhoods = types.map { |type| GeneralizedNeighborhood.similar_neighborhoods(type: type) }.flatten
+      neighborhoods_by_similar_neighborhood = types.map { |type| GeneralizedNeighborhood.neighborhoods_by_similar_neighborhood(type: type) }.flatten
+      {
+        images: images.map(&:attributes),
+        variable: variable.attributes,
+        control_points: control_points.map(&:attributes),
+        optimisation_variables: optimisation_variables.map(&:attributes),
+        pairs: Pair.all.map(&:attributes),
+        similar_neighborhoods: similar_neighborhoods.map(&:attributes),
+        neighborhoods_by_similar_neighborhood: neighborhoods_by_similar_neighborhood.map(&:attributes)
+      }
     end
   end
 end

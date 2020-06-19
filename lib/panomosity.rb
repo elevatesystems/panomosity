@@ -1,5 +1,7 @@
 require 'panomosity/control_point'
+require 'panomosity/generalized_neighborhood'
 require 'panomosity/image'
+require 'panomosity/measure'
 require 'panomosity/neighborhood'
 require 'panomosity/neighborhood_group'
 require 'panomosity/optimisation_variable'
@@ -13,6 +15,7 @@ require 'panomosity/version'
 require 'pathname'
 require 'fileutils'
 require 'optparse'
+require 'json'
 
 module Panomosity
   def self.parse(arguments)
@@ -77,6 +80,33 @@ module Panomosity
       parser.on('--version', 'Show the installed version') do
         puts VERSION
         exit
+      end
+
+      parser.on('--regional-distance-similarities-count COUNT', Integer, 'Set the minimum amount of regional control point counts for determining similar neighborhoods (default: 3)') do |count|
+        options[:regional_distance_similarities_count] = count
+      end
+
+      parser.on('--max-reduction-attempts COUNT', Integer, 'Set the max reduction attempts when removing neighborhood outliers (default: 2)') do |count|
+        options[:max_reduction_attempts] = count
+      end
+
+      desc = <<~DESC
+        Set distances to use when determining neighborhood region size in pairs
+        Use JSON e.g. '{"x1": 150, "x2": 30}'
+        Defaults:
+          Vertical pair is x is 10% of image width and y is 100px 
+          Horizontal pair is x is 100px and y is 10% of image height
+      DESC
+      parser.on('--distances [DISTANCE_JSON]', desc) do |distances|
+        options[:distances] = JSON.parse(distances) rescue nil
+      end
+
+      parser.on('--distances-horizontal [DISTANCE_JSON]', 'Same as above but only affects horizontal image pairs') do |distances|
+        options[:regional_distance_similarities_count] = JSON.parse(distances) rescue nil
+      end
+
+      parser.on('--distances-vertical [DISTANCE_JSON]', 'Same as above but only affects vertical image pairs') do |distances|
+        options[:regional_distance_similarities_count] = JSON.parse(distances) rescue nil
       end
 
       parser.on('-h', '--help', 'Display this screen') do

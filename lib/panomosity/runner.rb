@@ -26,6 +26,7 @@ module Panomosity
       get_columns_and_rows
       get_control_point_info
       get_neighborhood_info
+      get_panorama_attributes
       import_control_point_csv
       merge_image_parameters
       nona_grid
@@ -479,6 +480,14 @@ module Panomosity
       logger.info 'getting detailed neighborhood info'
       panorama = Panorama.new(@input_file, @options)
       panorama.get_neighborhood_info
+    end
+
+    def get_panorama_attributes
+      # for printing out the JSON
+      logger.level = Logger::UNKNOWN
+      logger.info 'getting panorama attributes'
+      panorama = Panorama.new(@input_file, @options)
+      puts panorama.attributes.to_json
     end
 
     def import_control_point_csv
