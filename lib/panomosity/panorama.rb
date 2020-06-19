@@ -327,7 +327,19 @@ module Panomosity
     end
 
     def calibration?
-      !!@input.split(/\n/).find { |line| '#panomosity calibration true' }
+      !!@input.split(/\n/).find { |line| line == '#panomosity calibration true' }
+    end
+
+    def save_file(filename)
+      logger.info "saving file #{filename}"
+
+      lines = @input.each_line.map do |line|
+        objects = [images, variable, control_points, optimisation_variables].flatten
+        object = objects.find { |object| object.raw == line }
+        object&.to_s || line
+      end.compact
+
+      File.open(filename, 'w') { |f| lines.each { |line| f.puts line } }
     end
   end
 end
