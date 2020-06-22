@@ -344,7 +344,7 @@ module Panomosity
 
     def attributes
       GeneralizedNeighborhood.calculate_all(panorama: self, options: @options)
-      control_points = control_points.dup
+      control_points = self.control_points.dup
       control_points.each_with_index { |cp, i| cp[:id] = i }
       neighborhoods = GeneralizedNeighborhood.neighborhoods.dup
       neighborhoods.each_with_index { |n, i| n.id = i }

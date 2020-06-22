@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    panomosity (0.1.36)
+    panomosity (0.1.37)
 
 GEM
   remote: https://rubygems.org/
@@ -38,4 +38,4 @@ DEPENDENCIES
   rspec (~> 3.0)
 
 BUNDLED WITH
-   1.16.1
+   1.17.3

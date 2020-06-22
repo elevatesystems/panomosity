@@ -169,7 +169,7 @@ module Panomosity
     end
 
     def attributes
-      attributes = @attributes.keep_if { |k, _| !%i(raw id).include?(k) }
+      attributes = @attributes.keep_if { |k, _| !%i(raw).include?(k) }
       attributes.merge!(column: column || 0, row: row || 0)
       attributes
     end
