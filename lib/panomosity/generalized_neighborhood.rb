@@ -14,7 +14,7 @@ module Panomosity
     class << self
       include Panomosity::Utils
 
-      attr_accessor :neighborhoods, :horizontal_similar_neighborhoods, :vertical_similar_neighborhoods, :horizontal_neighborhoods_by_similar_neighborhood, :vertical_neighborhoods_by_similar_neighborhood
+      attr_accessor :options, :neighborhoods, :horizontal_similar_neighborhoods, :vertical_similar_neighborhoods, :horizontal_neighborhoods_by_similar_neighborhood, :vertical_neighborhoods_by_similar_neighborhood
 
       def logger
         @logger ||= Panomosity.logger
@@ -24,18 +24,27 @@ module Panomosity
         { name: name }
       end
 
+      def horizontal
+        horizontal_neighborhoods_by_similar_neighborhood
+      end
+
+      def vertical
+        vertical_neighborhoods_by_similar_neighborhood
+      end
+
       def calculate_all(panorama:, options: {})
         @neighborhoods = []
+        @options = options
 
         Pair.create_pairs_from_panorama(panorama)
-        calculate_from_pairs(options: options)
-        calculate_from_neighborhoods(type: :horizontal, options: options)
-        calculate_from_neighborhoods(type: :vertical, options: options)
+        calculate_from_pairs
+        calculate_from_neighborhoods(type: :horizontal)
+        calculate_from_neighborhoods(type: :vertical)
 
         @neighborhoods
       end
 
-      def calculate_from_pairs(options: {})
+      def calculate_from_pairs
         logger.debug 'calculating neighborhoods from pairs'
         Pair.all.each do |pair|
           control_points = pair.control_points.select(&:not_generated?)
@@ -43,14 +52,16 @@ module Panomosity
             base_params = { center: control_point, scope: pair, options: options }
             position_params = { measure: { type: :position } }
             neighborhood = calculate_neighborhood(**base_params.merge(position_params))
+            pair.generalized_neighborhoods << neighborhood
             distance_params = { measure: { type: :distance, distances: { x1: neighborhood.dist_std } } }
             distance_neighborhood = calculate_neighborhood(**base_params.merge(distance_params))
             neighborhood.reference = distance_neighborhood
+            pair.generalized_neighborhoods << distance_neighborhood
           end
         end
       end
 
-      def calculate_from_neighborhoods(type:, options: {})
+      def calculate_from_neighborhoods(type:)
         count = options[:regional_distance_similarities_count] || 3
         attempts = options[:max_reduction_attempts] || 2
 
@@ -63,7 +74,7 @@ module Panomosity
         end
 
         std_outlier_reduction(type: type, max_reduction_attempts: attempts)
-        calculate_neighborhoods_by_similar_neighborhood(type: type, options: options)
+        calculate_neighborhoods_by_similar_neighborhood(type: type)
       end
 
       def calculate_neighborhood(center:, scope:, options:, measure: {})
@@ -83,7 +94,7 @@ module Panomosity
 
       def calculate_similar_neighborhoods(type: :horizontal, count: 3)
         similar_neighborhoods = neighborhoods.select(&:measure_position?).select(&:"#{type}?").select do |neighborhood|
-          neighborhood.reference.count >= count
+          neighborhood.scope.similar_neighborhoods << neighborhood if neighborhood.reference.count >= count
         end
         self.send(:"#{type}_similar_neighborhoods=", similar_neighborhoods)
       end
@@ -96,7 +107,7 @@ module Panomosity
         std_outlier_reduction(type: type, max_reduction_attempts: max_reduction_attempts, reduction_attempts: reduction_attempts + 1)
       end
 
-      def calculate_neighborhoods_by_similar_neighborhood(type: :horizontal, options: {})
+      def calculate_neighborhoods_by_similar_neighborhood(type: :horizontal)
         instance_variable_set("@#{type}_neighborhoods_by_similar_neighborhood", [])
         similar_neighborhoods(type: type).each do |neighborhood|
           base_params = { center: neighborhood, scope: self, options: options }

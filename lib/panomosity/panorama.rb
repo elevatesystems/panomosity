@@ -18,22 +18,25 @@ module Panomosity
       @logger = Panomosity.logger
     end
 
+    def calculate_neighborhoods
+      GeneralizedNeighborhood.calculate_all(panorama: self, options: options)
+    end
+
     def clean_control_points
-      if calibration?
-        Pair.calculate_neighborhoods(self, distance: 30)
-      else
-        Pair.calculate_neighborhoods(self, distance: 100)
-      end
-      control_points_to_keep = Pair.good_control_points_to_keep(count: 2)
+      options.merge!(distances: { x1: 30, x2: 30 }) if calibration? && !options[:distances].nil?
+      options.merge!(regional_distance_similarities_count: 2) unless options[:regional_distance_similarities_count]
+      calculate_neighborhoods
+
+      control_points_to_keep = Pair.select_control_points_with_regional_distance_similarities
       bad_control_points = control_points.reject { |cp| control_points_to_keep.map(&:raw).include?(cp.raw) }
       # far_control_points = control_points.select { |cp| cp.prdist > 50 }
       control_points_to_clean = bad_control_points.uniq(&:raw)
 
       # log warnings
       control_point_ratio = control_points_to_clean.count.to_f / control_points.count
-      logger.warn "Removing more than 30% (#{(control_point_ratio*100).round(4)}%) of control points. May potentially cause issues." if control_point_ratio >= 0.3
+      logger.warn "Removing more than 30% (#{(control_point_ratio * 100).round(4)}%) of control points. May potentially cause issues." if control_point_ratio >= 0.3
       control_point_pair_ratio = Pair.without_enough_control_points(ignore_connected: true).count.to_f / Pair.all.count
-      logger.warn "More than 50% (#{(control_point_pair_ratio*100).round(4)}%) of pairs have fewer than 3 control points. May potentially cause issues." if control_point_pair_ratio >= 0.5
+      logger.warn "More than 50% (#{(control_point_pair_ratio * 100).round(4)}%) of pairs have fewer than 3 control points. May potentially cause issues." if control_point_pair_ratio >= 0.5
 
       control_points_to_clean
     end
@@ -41,12 +44,8 @@ module Panomosity
     def fix_unconnected_image_pairs
       logger.info 'finding unconnected image pairs'
 
-      if calibration?
-        Pair.calculate_neighborhoods(self, distance: 30)
-      else
-        Pair.calculate_neighborhoods(self, distance: 100)
-      end
-      Pair.calculate_neighborhood_groups
+      options.merge!(distances: { x1: 30, x2: 30 }) if calibration? && !options[:distances].nil?
+      calculate_neighborhoods
 
       unconnected_image_pairs = Pair.unconnected
       logger.debug unconnected_image_pairs.map { |i| { type: i.type, pair: i.pair.map(&:id) } }
@@ -92,15 +91,15 @@ module Panomosity
     def generate_control_points(pair: nil, bad_control_point: nil, message: '')
       if pair
         if pair.horizontal?
-          group = NeighborhoodGroup.horizontal.first
+          group = GeneralizedNeighborhood.horizontal.first
         else
-          group = NeighborhoodGroup.vertical.first
+          group = GeneralizedNeighborhood.vertical.first
         end
       else
         if bad_control_point.conn_type == :horizontal
-          group = NeighborhoodGroup.horizontal.first
+          group = GeneralizedNeighborhood.horizontal.first
         else
-          group = NeighborhoodGroup.vertical.first
+          group = GeneralizedNeighborhood.vertical.first
         end
       end
 
@@ -153,8 +152,7 @@ module Panomosity
     end
 
     def diagnose
-      Pair.calculate_neighborhoods(self)
-      Pair.calculate_neighborhood_groups
+      calculate_neighborhoods
 
       recommendations = []
       messages = []
@@ -184,7 +182,7 @@ module Panomosity
       end
 
       # neighborhood group tests
-      group_count = NeighborhoodGroup.horizontal.count
+      group_count = GeneralizedNeighborhood.horizontal.count
       if group_count < 5
         message = <<~MESSAGE
           Total number of horizontal neighborhood groups is #{group_count} which is very low.
@@ -194,7 +192,7 @@ module Panomosity
         messages << message
       end
 
-      group_std_avg = calculate_average(values: NeighborhoodGroup.horizontal[0..4].map(&:prdist_std))
+      group_std_avg = calculate_average(values: GeneralizedNeighborhood.horizontal[0..4].map(&:dist_std))
       if group_std_avg > 1.0
         message = <<~MESSAGE
           The standard deviation of distances in the top 5 horizontal neighborhood groups is #{group_std_avg} which is high.
@@ -207,7 +205,7 @@ module Panomosity
         messages << message
       end
 
-      group_control_points = NeighborhoodGroup.horizontal.first.control_points.count
+      group_control_points = GeneralizedNeighborhood.horizontal.first.control_points.count
       total_control_points = Pair.horizontal.map(&:control_points).flatten.uniq(&:raw).count
       group_control_point_ratio = group_control_points.to_f / total_control_points
       if group_control_point_ratio < 0.2
@@ -222,7 +220,7 @@ module Panomosity
         recommendations << 'horizontal'
       end
 
-      group_count = NeighborhoodGroup.vertical.count
+      group_count = GeneralizedNeighborhood.vertical.count
       if group_count < 5
         message = <<~MESSAGE
           Total number of vertical neighborhood groups is #{group_count} which is very low.
@@ -232,7 +230,7 @@ module Panomosity
         messages << message
       end
 
-      group_std_avg = calculate_average(values: NeighborhoodGroup.vertical[0..4].map(&:prdist_std))
+      group_std_avg = calculate_average(values: GeneralizedNeighborhood.vertical[0..4].map(&:dist_std))
       if group_std_avg > 1.0
         message = <<~MESSAGE
           The standard deviation of distances in the top 5 vertical neighborhood groups is #{group_std_avg} which is high.
@@ -245,7 +243,7 @@ module Panomosity
         messages << message
       end
 
-      group_control_points = NeighborhoodGroup.vertical.first.control_points.count
+      group_control_points = GeneralizedNeighborhood.vertical.first.control_points.count
       total_control_points = Pair.vertical.map(&:control_points).flatten.uniq(&:raw).count
       group_control_point_ratio = group_control_points.to_f / total_control_points
       if group_control_point_ratio < 0.2
@@ -274,11 +272,24 @@ module Panomosity
           delta_d: delta_d,
           delta_e: delta_e,
           roll: roll,
-          horizontal: NeighborhoodGroup.horizontal.first.serialize,
-          vertical: NeighborhoodGroup.vertical.first.serialize
+          horizontal: GeneralizedNeighborhood.horizontal.first.attributes,
+          vertical: GeneralizedNeighborhood.vertical.first.attributes
         }
       }
+    rescue => error
+      message = "Got error #{error.message} when calculating neighborhoods. Recommending fallback"
 
+      logger.error message
+      error.backtrace.each { |line| logger.error line }
+
+      recommendations = %w(horizontal vertical)
+
+      diagnostic_report = {
+        messages: messages,
+        recommendations: recommendations,
+        data: {}
+      }
+    ensure
       File.open('diagnostic_report.json', 'w+') { |f| f.puts diagnostic_report.to_json }
 
       if recommendations.empty?
@@ -301,17 +312,13 @@ module Panomosity
       calibration_report = JSON.parse(File.read(filename))
 
       if @options[:report_type] == 'position'
-        if calibration?
-          Pair.calculate_neighborhoods(self, distance: 30)
-        else
-          Pair.calculate_neighborhoods(self, distance: 100)
-        end
-        Pair.calculate_neighborhood_groups
+        options.merge!(distances: { x1: 30, x2: 30 }) if calibration? && !options[:distances].nil?
+        calculate_neighborhoods
 
-        xh_avg = NeighborhoodGroup.horizontal.first.x_avg
-        yh_avg = NeighborhoodGroup.horizontal.first.y_avg
-        xv_avg = NeighborhoodGroup.vertical.first.x_avg
-        yv_avg = NeighborhoodGroup.vertical.first.y_avg
+        xh_avg = GeneralizedNeighborhood.horizontal.first.x_avg
+        yh_avg = GeneralizedNeighborhood.horizontal.first.y_avg
+        xv_avg = GeneralizedNeighborhood.vertical.first.x_avg
+        yv_avg = GeneralizedNeighborhood.vertical.first.y_avg
         calibration_report['position'] = {
           xh_avg: xh_avg,
           yh_avg: yh_avg,
@@ -343,7 +350,7 @@ module Panomosity
     end
 
     def attributes
-      GeneralizedNeighborhood.calculate_all(panorama: self, options: @options)
+      calculate_neighborhoods
       control_points = self.control_points.dup
       control_points.each_with_index { |cp, i| cp[:id] = i }
       neighborhoods = GeneralizedNeighborhood.neighborhoods.dup

@@ -296,7 +296,7 @@ module Panomosity
     def export_control_point_csv
       logger.info 'exporting control point csv'
       panorama = Panorama.new(@input_file, @options)
-      Pair.calculate_neighborhoods(panorama, distance: 30)
+      panorama.calculate_neighborhoods
 
       filename = 'control_points.csv'
       headers = %w(image_1_name image_2_name image_1_id image_2_id type width height d1 e1 d2 e2 x1 y1 x2 y2 rx ry r)

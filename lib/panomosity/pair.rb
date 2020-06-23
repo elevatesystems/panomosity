@@ -5,7 +5,7 @@ module Panomosity
     include Panomosity::Utils
     extend Panomosity::Utils
 
-    attr_accessor :pair, :control_points, :neighborhoods, :type
+    attr_accessor :pair, :control_points, :neighborhoods, :type, :generalized_neighborhoods, :similar_neighborhoods
 
     class << self
       attr_accessor :panorama, :logger
@@ -22,8 +22,8 @@ module Panomosity
         @pairs
       end
 
-      def good_control_points_to_keep(count: 3)
-        @pairs.map { |pair| pair.good_control_points_to_keep(count: count) }.flatten.uniq(&:raw)
+      def select_control_points_with_regional_distance_similarities
+        @pairs.map(&:select_control_points_with_regional_distance_similarities).flatten.uniq(&:raw)
       end
 
       def unconnected
@@ -44,6 +44,9 @@ module Panomosity
       rows = images.map(&:row).uniq.sort
 
       @pairs = []
+      @horizontal_pairs = []
+      @vertical_pairs = []
+      
       # horizontal pair creation
       rows.each do |row|
         columns.each do |column|
@@ -52,7 +55,9 @@ module Panomosity
           image_2 = images.find { |i| i.row == row && i.column == column.next }
           next if @panorama.calibration? && (image_1.nil? || image_2.nil?)
           control_points = @panorama.control_points.select { |cp| [cp.n1, cp.n2].sort == [image_1.id, image_2.id].sort }
-          @pairs << Pair.new([image_1, image_2].sort_by(&:id), control_points: control_points, type: :horizontal)
+          pair = Pair.new([image_1, image_2].sort_by(&:id), control_points: control_points, type: :horizontal)
+          @pairs << pair
+          @horizontal_pairs << pair
         end
       end
 
@@ -64,7 +69,9 @@ module Panomosity
           image_2 = images.find { |i| i.column == column && i.row == row.next }
           next if @panorama.calibration? && (image_1.nil? || image_2.nil?)
           control_points = @panorama.control_points.select { |cp| [cp.n1, cp.n2].sort == [image_1.id, image_2.id].sort }
-          @pairs << Pair.new([image_1, image_2].sort_by(&:id), control_points: control_points, type: :vertical)
+          pair = Pair.new([image_1, image_2].sort_by(&:id), control_points: control_points, type: :vertical)
+          @pairs << pair
+          @vertical_pairs << pair
         end
       end
     end
@@ -150,6 +157,8 @@ module Panomosity
       @pair = pair
       @control_points = control_points
       @neighborhoods = []
+      @generalized_neighborhoods = []
+      @similar_neighborhoods = []
       @type = type
     end
 
@@ -218,6 +227,27 @@ module Panomosity
           control_points_to_keep
         end
       else
+        control_points
+      end
+    end
+
+    # Distance neighborhoods
+    def similar_control_points
+      @similar_control_points ||= similar_neighborhoods.map(&:reference).map(&:control_points).flatten.uniq(&:raw)
+    end
+
+    def select_control_points_with_regional_distance_similarities
+      # Keep all our control points if we have less than 10
+      if control_points.count >= 10
+        ratio = similar_control_points.count.to_f / control_points.count
+        if ratio < 0.2
+          Panomosity.logger.warn "#{to_s} keeping less than 20% (#{(ratio * 100).round(4)}%) of #{control_points.count} control points. Reverting and keeping all control points"
+          control_points
+        else
+          similar_control_points
+        end
+      else
+        Panomosity.logger.debug "Skipping pair #{to_s} since it has fewer than 10 control points"
         control_points
       end
     end

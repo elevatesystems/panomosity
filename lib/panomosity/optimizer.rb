@@ -30,17 +30,14 @@ module Panomosity
         logger.info "applying custom values of xh_avg: #{xh_avg}, yh_avg: #{yh_avg}, xv_avg: #{xv_avg}, yv_avg: #{yv_avg}"
       end
 
-      unless xh_avg && yh_avg && xv_avg && yv_avg
-        Pair.calculate_neighborhoods(panorama)
-        Pair.calculate_neighborhood_groups
-      end
+      panorama.calculate_neighborhoods unless xh_avg && yh_avg && xv_avg && yv_avg
 
       ds = images.map(&:d).uniq.sort
       es = images.map(&:e).uniq.sort
 
       # get the average error for the best neighborhood group
-      x_avg = xh_avg || NeighborhoodGroup.horizontal.first.rx_avg
-      y_avg = yv_avg || NeighborhoodGroup.vertical.first.ry_avg
+      x_avg = xh_avg || GeneralizedNeighborhood.horizontal.first.x_avg
+      y_avg = yv_avg || GeneralizedNeighborhood.vertical.first.y_avg
 
       # start horizontally
       d_map = {}
@@ -57,8 +54,8 @@ module Panomosity
       logger.debug "created e_map #{e_map}"
 
       # add in the other offset
-      x_avg = xv_avg || NeighborhoodGroup.vertical.first.rx_avg
-      y_avg = yh_avg || NeighborhoodGroup.horizontal.first.ry_avg
+      x_avg = xv_avg || GeneralizedNeighborhood.vertical.first.x_avg
+      y_avg = yh_avg || GeneralizedNeighborhood.horizontal.first.y_avg
 
       de_map = {}
       d_map.each_with_index do |(dk,dv),di|
@@ -142,10 +139,9 @@ module Panomosity
     end
 
     def calculate_average_distance
-      Pair.calculate_neighborhoods(panorama)
-      Pair.calculate_neighborhood_groups
-      horizontal_distances = NeighborhoodGroup.horizontal[0..4].map(&:prdist_avg)
-      vertical_distances = NeighborhoodGroup.vertical[0..4].map(&:prdist_avg)
+      panorama.calculate_neighborhoods
+      horizontal_distances = GeneralizedNeighborhood.horizontal[0..4].map(&:dist_avg)
+      vertical_distances = GeneralizedNeighborhood.vertical[0..4].map(&:dist_avg)
       calculate_average(values: horizontal_distances + vertical_distances)
     end
 
@@ -161,9 +157,8 @@ module Panomosity
       images.each do |image|
         image.r = 0.0
       end
-      Pair.calculate_neighborhoods(panorama)
-      Pair.calculate_neighborhood_groups
-      cps = NeighborhoodGroup.horizontal.first.control_points
+      panorama.calculate_neighborhoods
+      cps = GeneralizedNeighborhood.horizontal.first.control_points
       avg, std = *calculate_average_and_std(values: cps.map(&:roll))
       # 0.1 degrees of std
       while std > 0.1
