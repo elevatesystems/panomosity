@@ -610,12 +610,17 @@ module Panomosity
       logger.info 'preparing for pr0ntools'
 
       images = Image.parse(@input_file)
+      # ds --> X (cols)
+      # es --> Y (rows)
       ds = images.map(&:d).uniq.sort
       es = images.map(&:e).uniq.sort
 
-      # within two pixels of each other
-      d_groups = ds.map { |d| ds.select { |n| n.between?(d-2, d+2) }.sort }
-      e_groups = es.map { |e| es.select { |n| n.between?(e-2, e+2) }.sort }
+      # split ds and es into groups within two pixels of each other,
+      # required because d/e can vary a few pixels based on system precision
+      # each group of d/e represents an acceptable pixel range
+      # for images to be considered part of a col/row
+      d_groups = ds.map { |d| ds.select { |n| n.between?(d-2, d+2) }.sort }.uniq
+      e_groups = es.map { |e| es.select { |n| n.between?(e-2, e+2) }.sort }.uniq
 
       fov = images.map(&:v).uniq.find { |v| v != 0.0 }
       images.each do |i|
@@ -641,7 +646,12 @@ module Panomosity
       FileUtils.mkdir_p(new_dir)
 
       logger.info 'renaming files to format cX_rY.jpg'
-      images.each { |image| FileUtils.cp(image[:original_n], new_dir + image.n) }
+      images.each do |image|
+        original_name = image[:original_n]
+        new_name = new_dir + image.n
+        FileUtils.cp(original_name, new_name)
+        logger.debug "copied #{original_name} to #{new_name}"
+      end
 
       logger.info 'creating scan.json'
       image_first_col = images.find { |image| image.n == 'c0_r0.jpg' }
