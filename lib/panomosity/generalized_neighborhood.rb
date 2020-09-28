@@ -88,6 +88,17 @@ module Panomosity
         type == :horizontal ? @horizontal_similar_neighborhoods : @vertical_similar_neighborhoods
       end
 
+      def similar_neighborhoods!(type: :horizontal)
+        neighborhoods = similar_neighborhoods(type: type)
+
+        if neighborhoods.nil? || neighborhoods.empty?
+          error = "No similar #{type} neighborhoods found"
+          raise NoSimilarNeighborhoodsError, error
+        else
+          neighborhoods
+        end
+      end
+
       def neighborhoods_by_similar_neighborhood(type: :horizontal)
         type == :horizontal ? @horizontal_neighborhoods_by_similar_neighborhood : @vertical_neighborhoods_by_similar_neighborhood
       end
@@ -101,9 +112,14 @@ module Panomosity
 
       def std_outlier_reduction(type: :horizontal, max_reduction_attempts: 2, reduction_attempts: 0)
         return if reduction_attempts >= max_reduction_attempts
+
         logger.debug "twice reducing #{type} neighborhood std outliers"
-        avg, std = *calculate_average_and_std(values: similar_neighborhoods(type: type).map(&:dist_std))
-        similar_neighborhoods(type: type).select! { |n| (avg - n.dist_std).abs <= std }
+
+        neighborhoods = similar_neighborhoods!(type: type)
+        std_dist_of_neighborhoods = neighborhoods.map(&:dist_std)
+        avg, std = *calculate_average_and_std(values: std_dist_of_neighborhoods)
+
+        similar_neighborhoods!(type: type).select! { |n| (avg - n.dist_std).abs <= std }
         std_outlier_reduction(type: type, max_reduction_attempts: max_reduction_attempts, reduction_attempts: reduction_attempts + 1)
       end
 
