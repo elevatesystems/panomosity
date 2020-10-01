@@ -1,14 +1,16 @@
 require 'logger'
 require 'json'
 require 'csv'
+require 'panomosity/xlsx_writer'
 
 module Panomosity
   class Runner
     include Panomosity::Utils
+    include Panomosity::XLSXWriter
 
     attr_reader :logger
 
-    AVAILABLE_COMMANDS = %w(
+    AVAILABLE_COMMANDS = %w[
       add_calibration_flag
       apply_calibration_values
       check_position_changes
@@ -20,6 +22,7 @@ module Panomosity
       crop_centers
       diagnose
       export_control_point_csv
+      export_panorama_attributes_to_csv
       fix_conversion_errors
       fix_unconnected_image_pairs
       generate_border_line_control_points
@@ -34,7 +37,7 @@ module Panomosity
       prepare_for_pr0ntools
       remove_anchor_variables
       standardize_roll
-    )
+    ]
 
     def initialize(options)
       @options = options
@@ -299,7 +302,7 @@ module Panomosity
       panorama.calculate_neighborhoods
 
       filename = 'control_points.csv'
-      headers = %w(image_1_name image_2_name image_1_id image_2_id type width height d1 e1 d2 e2 x1 y1 x2 y2 rx ry r)
+      headers = %w[image_1_name image_2_name image_1_id image_2_id type width height d1 e1 d2 e2 x1 y1 x2 y2 rx ry r]
       CSV.open(filename, 'w+') do |csv|
         csv << headers
         panorama.control_points.each do |cp|
@@ -488,6 +491,70 @@ module Panomosity
       logger.info 'getting panorama attributes'
       panorama = Panorama.new(@input_file, @options)
       puts panorama.attributes.to_json
+    end
+
+    def export_panorama_attributes_to_csv
+      panorama = Panorama.new(@input_file, @options)
+      panorama.calculate_neighborhoods
+
+      logger.info "Making #{Dir.pwd}/#{@input}_attributes Directory"
+
+      dir = "#{Dir.pwd}/#{@input}_attributes"
+      Dir.mkdir(dir) unless File.exists?(dir)
+
+      logger.info "Done. Moving into #{dir} Directory"
+
+      Dir.chdir "#{@input}_attributes"
+
+      logger.info "Making control_points.csv"
+
+      filename = 'control_points.csv'
+      headers = %w[image_1_name image_2_name image_1_id image_2_id type width height d1 e1 d2 e2 x1 y1 x2 y2 rx ry r]
+      CSV.open(filename, 'w+') do |csv|
+        csv << headers
+        panorama.control_points.each do |cp|
+          pair = Pair.all.find { |p| p.control_points.include?(cp) }
+          csv << [cp.i1.name, cp.i2.name, cp.i1.id, cp.i2.id, pair.type, cp.i1.w, cp.i1.h, cp.i1.d, cp.i1.e,
+                  cp.i2.d, cp.i2.e, cp.x1, cp.y1, cp.x2, cp.y2, cp.px, cp.py, cp.pdist]
+        end
+      end
+
+      logger.info "Done. Check for #{filename}"
+
+      attributes = panorama.attributes
+
+      logger.info "Making cp_pairs.csv"
+
+      filename = 'cp_pairs.csv'
+      headers = attributes[:pairs].first.keys
+      CSV.open(filename,"w") do |csv|
+        csv << headers
+        attributes[:pairs].each do |pair|
+          csv << pair.values
+        end
+      end
+
+      logger.info "Done. Check for #{filename}"
+
+      logger.info "Making neighborhood_pairs.csv"
+
+      filename = 'neighborhood_pairs.csv'
+      headers = ['data_type', attributes[:similar_neighborhoods].first.keys].flatten
+      CSV.open(filename,'w') do |csv|
+        csv << headers
+        attributes[:similar_neighborhoods].each do |neighborhood|
+          csv << ['similar_neighborhoods', neighborhood.values].flatten(1)
+        end
+        attributes[:neighborhoods_by_similar_neighborhood].each do |neighborhood|
+          csv << ['neighborhoods_by_similar_neighborhood', neighborhood.values].flatten(1)
+        end
+      end
+
+      logger.info "Done. Check for #{filename}"
+
+      csv_to_xlsx(['control_points.csv', 'cp_pairs.csv', 'neighborhood_pairs.csv'], 'attributes')
+
+      Dir.chdir '..'
     end
 
     def import_control_point_csv
