@@ -230,12 +230,19 @@ module Panomosity
       logger.debug "cropping to #{percent}%"
       unless @options[:without_cropping]
         images = Image.parse(@input_file)
-        images.each do |image|
+
+        crop_center_commands = images.map do |image|
           width_offset = (image.w.to_f * (1 - scale_factor) / 2).round
           height_offset = (image.h.to_f * (1 - scale_factor) / 2).round
           logger.debug "cropping #{image.name}"
-          `convert #{image.name} -crop "#{percent}%x#{percent}%+#{width_offset}+#{height_offset}" #{image.name}`
+
+          "convert #{image.name} -crop '#{percent}%x#{percent}%+#{width_offset}+#{height_offset}' #{image.name}"
         end
+
+        crop_centers_command = crop_center_commands.join("\n")
+        parallel_command = "cat <<'EOF' | parallel \n%s\nEOF"
+        crop_centers_command = parallel_command % crop_centers_command
+        `#{crop_centers_command}`
       end
 
       # Since all images have been cropped, we need to change d,e params to move images based on how much was cropped
