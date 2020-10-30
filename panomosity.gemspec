@@ -6,7 +6,7 @@ require 'panomosity/version'
 Gem::Specification.new do |spec|
   spec.name          = 'panomosity'
   spec.version       = Panomosity::VERSION
-  spec.authors       = ['Oliver Garcia']
+  spec.authors       = ['Oliver Garcia', 'Joshua Stowers', 'Evan Gray']
   spec.email         = ['ogarci5@gmail.com']
 
   spec.summary       = %q{Wrapper for the PTO file parsing needed for PanoTools.}
