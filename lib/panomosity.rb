@@ -46,6 +46,10 @@ module Panomosity
         options[:report] = report
       end
 
+      parser.on('--with-masking', 'Use nona-mask to include *_mask.tif files when running "nona_grid"') do |wm|
+        options[:with_masking] = wm
+      end
+
       parser.on('--without-cropping', 'Do not crop when running "crop_centers" (usually when the original run failed)') do |wc|
         options[:without_cropping] = wc
       end
